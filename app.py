@@ -1,16 +1,36 @@
-from flask import Flask
+from flask import Flask, render_template
 from markupsafe import escape
 from flask import url_for
 
 app = Flask(__name__)
 #为了便于理解，你可以把 Web 程序看作是一堆这样的视图函数的集合：编写不同的函数处理对应 URL 的请求
 
+#定义虚拟数据
+name = 'Lumi'
+movies = [
+    {'title': 'My Neighbor Totoro', 'year': '1988'},
+    {'title': 'Dead Poets Society', 'year': '1989'},
+    {'title': 'A Perfect World', 'year': '1993'},
+    {'title': 'Leon', 'year': '1994'},
+    {'title': 'Mahjong', 'year': '1996'},
+    {'title': 'Swallowtail Butterfly', 'year': '1996'},
+    {'title': 'King of Comedy', 'year': '1999'},
+    {'title': 'Devils on the Doorstep', 'year': '1999'},
+    {'title': 'WALL-E', 'year': '2008'},
+    {'title': 'The Pork of Music', 'year': '2012'},
+]
+
 @app.route('/')
-# @app.route('/index')
-# @app.route('/home')
-# 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
-def hello():
-    return '<h1>你好 Totoro!</h1><img src="http://helloflask.com/totoro.gif">'
+def index():
+    return render_template('index.html', name=name, movies=movies)
+# 为了让模板正确渲染，我们还要把模板内部使用的变量(name, movies)通过关键字参数传入这个函数
+
+# @app.route('/')
+# # @app.route('/index')
+# # @app.route('/home')
+# # 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
+# def hello():
+#     return '<h1>你好 Totoro!</h1><img src="http://helloflask.com/totoro.gif">'
 
 @app.route('/user/<name>')
 def user_page(name):
