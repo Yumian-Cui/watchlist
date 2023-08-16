@@ -16,6 +16,7 @@ else:  # 否则使用四个斜线
 
 #为了便于理解，你可以把 Web 程序看作是一堆这样的视图函数的集合：编写不同的函数处理对应 URL 的请求
 app = Flask(__name__)
+# app.register_blueprint(views)
 app.register_blueprint(views, url_prefix="/")
 #配置变量
 app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(app.root_path, 'data.db')
@@ -44,6 +45,17 @@ db.init_app(app) # use the init_app method of the SQLAlchemy class to initialize
 #     user_id = db.Column(db.Integer, db.ForeignKey('user.id')) #将 User 表和 Movie 表建立关联 added a user_id column to the Movie table, which is a foreign key that references the id column in the User table
 
 # #https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/#one-to-many-relationships
+
+@app.context_processor
+def inject_user():  # 函数名可以随意修改
+    user = User.query.first()
+    return dict(user=user)  # 需要返回字典，等同于 return {'user': user}
+
+#404 错误处理函数 当 404 错误发生时，这个函数会被触发，返回值会作为响应主体返回给客户端
+@app.errorhandler(404)  # 传入要处理的错误代码
+def page_not_found(e):  # 接受异常对象作为参数
+    # user = User.query.first()
+    return render_template('404.html'), 404  # 返回模板和状态码
 
 
 #编写一个自定义命令来自动执行创建数据库表操作
