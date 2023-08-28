@@ -5,6 +5,13 @@ from flask import Flask, render_template, flash, redirect, request
 from markupsafe import escape
 from flask import url_for
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
+from flask_wtf import FlaskForm
+from wtforms import StringField, IntegerField, SubmitField, DateField
+from wtforms.validators import DataRequired, Length
+from datetime import datetime
+from wtforms import widgets
+
+
 # from views import views #import views from our views file
 # from models import db, User, Movie
 
@@ -56,6 +63,7 @@ def internal_server_error(e):
 #编写一个自定义命令来自动执行创建数据库表操作
 import click
 @app.cli.command()  # 注册为命令，可以传入 name 参数来自定义命令
+# flask initdb 
 @click.option('--drop', is_flag=True, help='Create after drop.')  # 设置选项
 def initdb(drop):
     """Initialize the database."""
@@ -101,75 +109,40 @@ def forge():
 # ******************************************** VIEWS ********************************************
 
 @app.route('/', methods=['GET', 'POST'])
+# 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
 def index():
-    if request.method == 'POST':  # 判断是否是 POST 请求
-        # 获取表单数据
-        title = request.form.get('title')  # 传入表单对应输入字段的 name 值
-        year = request.form.get('year')
-        # 验证数据
-        if not title or not year or len(year) != 4 or len(title) > 60: #在真实世界里，你会进行更严苛的验证，比如对数据去除首尾的空格。一般情况下，我们会使用第三方库（比如 WTForms）来实现表单数据的验证工作。
-            flash('Invalid input.')  # 显示错误提示
-            return redirect(url_for('index'))  # 重定向回主页
-        # 保存表单数据到数据库
+    form = MovieForm()
+    if form.validate_on_submit():
+        title = form.title.data
+        year = form.year.data
+        # Add movie to database here...
         movie = Movie(title=title, year=year)  # 创建记录
-        # user = User.query.get_or_404(user_id)
-        # movie.user_id = user.id # TODO: REMEMBER TO associate added movie with the user
         db.session.add(movie)  # 添加到数据库会话
         db.session.commit()  # 提交数据库会话
         flash('Item created.')  # 显示成功创建的提示
-        return redirect(url_for('index'))  # 重定向回主页
-
+        return redirect(url_for('index'))
     movies = Movie.query.all()
-    return render_template('index.html', movies=movies)
+    return render_template('index.html', movies=movies, form=form)
 
-# @app.route('/')
-# def index():
-#     # user = User.query.first()  # 读取用户记录
-#     movies = Movie.query.all()  # 读取所有电影记录
-#     return render_template('index.html', movies=movies)
-    # return render_template('index.html', name=name, movies=movies)
-# 为了让模板正确渲染，我们还要把模板内部使用的变量(name, movies)通过关键字参数传入这个函数
-
-@app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+@app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 def edit(movie_id):
     movie = Movie.query.get_or_404(movie_id)
-
-    if request.method == 'POST':  # 处理编辑表单的提交请求
-        title = request.form['title']
-        year = request.form['year']
-
-        if not title or not year or len(year) != 4 or len(title) > 60:
-            flash('Invalid input.')
-            return redirect(url_for('edit', movie_id=movie_id))  # 重定向回对应的编辑页面
-
-        movie.title = title  # 更新标题
-        movie.year = year  # 更新年份
-        db.session.commit()  # 提交数据库会话
+    form = MovieForm(obj=movie)
+    if form.validate_on_submit():
+        movie.title = form.title.data
+        movie.year = form.year.data
+        db.session.commit()
         flash('Item updated.')
-        return redirect(url_for('index'))  # 重定向回主页
+        return redirect(url_for('index'))
+    return render_template('edit.html', movie=movie, form=form) # 传入被编辑的电影记录
 
-    return render_template('edit.html', movie=movie)  # 传入被编辑的电影记录
-
-@app.route('/movie/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
+@app.route('/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
 def delete(movie_id):
     movie = Movie.query.get_or_404(movie_id)  # 获取电影记录
     db.session.delete(movie)  # 删除对应的记录
     db.session.commit()  # 提交数据库会话
     flash('Item deleted.')
     return redirect(url_for('index'))  # 重定向回主页
-
-# #404 错误处理函数 当 404 错误发生时，这个函数会被触发，返回值会作为响应主体返回给客户端
-# @views.errorhandler(404)  # 传入要处理的错误代码
-# def page_not_found(e):  # 接受异常对象作为参数
-#     user = User.query.first()
-#     return render_template('404.html', user=user), 404  # 返回模板和状态码
-
-# @app.route('/')
-# # @app.route('/index')
-# # @app.route('/home')
-# # 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
-# def hello():
-#     return '<h1>你好 Totoro!</h1><img src="http://helloflask.com/totoro.gif">'
 
 @app.route('/user/<name>')
 def user_page(name):
@@ -209,39 +182,20 @@ class Movie(db.Model):  # 模型类是Movie, 表名将会是 movie
 
 # #https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/#one-to-many-relationships
 
+# from wtforms.validators import ValidationError
+
+# def validate_year(form, field):
+#     if field.data > datetime.now().year:
+#         raise ValidationError('Year cannot be after current year.')
+
+#Create a new class that inherits from FlaskForm:
+class MovieForm(FlaskForm):
+    title = StringField('title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
+    year = StringField('year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
+    # year = DateField('year', validators=[DataRequired()], format='%Y')
+    # submit = SubmitField('Add')
+
 # END CLASS
-
-
-# @app.route('/')
-# def index():
-#     user = User.query.first()  # 读取用户记录
-#     movies = Movie.query.all()  # 读取所有电影记录
-#     return render_template('index.html', user=user, movies=movies)
-#     # return render_template('index.html', name=name, movies=movies)
-# # 为了让模板正确渲染，我们还要把模板内部使用的变量(name, movies)通过关键字参数传入这个函数
-
-# # @app.route('/')
-# # # @app.route('/index')
-# # # @app.route('/home')
-# # # 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
-# # def hello():
-# #     return '<h1>你好 Totoro!</h1><img src="http://helloflask.com/totoro.gif">'
-
-# @app.route('/user/<name>')
-# def user_page(name):
-#     return f'User: {escape(name)}'
-
-# @app.route('/test')
-# def test_url_for():
-#     # 下面是一些调用示例（请访问 http://localhost:5000/test 后在命令行窗口查看输出的 URL）：
-#     print(url_for('hello'))  # 生成 hello 视图函数对应的 URL，将会输出：/
-#     # 注意下面两个调用是如何生成包含 URL 变量的 URL 的
-#     print(url_for('user_page', name='greyli'))  # 输出：/user/greyli
-#     print(url_for('user_page', name='peter'))  # 输出：/user/peter
-#     print(url_for('test_url_for'))  # 输出：/test
-#     # 下面这个调用传入了多余的关键字参数，它们会被作为查询字符串附加到 URL 后面。
-#     print(url_for('test_url_for', num=2))  # 输出：/test?num=2
-#     return 'Test page'
 
 #==========================================================================
 

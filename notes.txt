@@ -1,0 +1,2 @@
+当你在一个新PC上时，你需要保证你的Flask和pip是最新的，在Windows可能会报错Fatal error in launcher，强制你在每个指令前加上python -m。你还需要保证重新创建database用相应的指令，不然会报错OperationalError
+sqlalchemy.exc.OperationalError。
