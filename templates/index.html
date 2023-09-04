@@ -2,14 +2,15 @@
 
 {% block content %}
 <p>{{ movies|length }} Titles</p>
-<form method="post">
+{{ render_form(form) }}
+<!-- <form method="post">
     {{ form.csrf_token }}
     {{ form.title.label }} {{ form.title }}
     {{ form.year.label }} {{ form.year }}
-    <!-- Name <input type="text" name="title" autocomplete="off" required>
-    Year <input type="text" name="year" autocomplete="off" required> -->
+    Name <input type="text" name="title" autocomplete="off" required> // should be commented out
+    Year <input type="text" name="year" autocomplete="off" required> // should be commented out
     <input class="btn" type="submit" name="submit" value="Add">
-</form>
+</form> -->
 <ul class="movie-list">
     {% for movie in movies %}
     <li>{{ movie.title }} - {{ movie.year }}

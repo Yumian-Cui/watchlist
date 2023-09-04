@@ -10,7 +10,7 @@ from wtforms import StringField, IntegerField, SubmitField, DateField
 from wtforms.validators import DataRequired, Length
 from datetime import datetime
 from wtforms import widgets
-
+from flask_bootstrap import Bootstrap5
 
 # from views import views #import views from our views file
 # from models import db, User, Movie
@@ -32,6 +32,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(app.root_path, 'da
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
 
 app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
+
+bootstrap = Bootstrap5(app)
 
 # DO THIS AFTER initialized with the correct configuration!!!
 # db.init_app(app) # use the init_app method of the SQLAlchemy class to initialize the db object with the app object after it has been created
@@ -193,7 +195,7 @@ class MovieForm(FlaskForm):
     title = StringField('title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
     year = StringField('year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
     # year = DateField('year', validators=[DataRequired()], format='%Y')
-    # submit = SubmitField('Add')
+    submit = SubmitField()
 
 # END CLASS
 
