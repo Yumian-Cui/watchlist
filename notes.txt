@@ -1,2 +1,44 @@
 当你在一个新PC上时，你需要保证你的Flask和pip是最新的，在Windows可能会报错Fatal error in launcher，强制你在每个指令前加上python -m。你还需要保证重新创建database用相应的指令，不然会报错OperationalError
 sqlalchemy.exc.OperationalError。
+
+to activate env: . env/Scripts/activate
+
+Gave up 10/19: 你可以把删除按钮的行内 JavaScript 代码改为事件监听函数，写到单独的 JavaScript 文件里。再进一步，你也可以使用 JavaScript 来监听点击删除按钮的动作，并发送删除条目的 POST 请求，这样删除按钮就可以使用普通 <a> 标签（CSRF 令牌存储在元素属性里），而不用创建表单元素。
+
+<!-- <form class="inline-form" method="post" action="{{ url_for('delete', movie_id=movie.id) }}"> -->
+    <input class="btn" type="submit" name="delete" value="Delete" id="del-btn">
+<!-- </form> -->
+
+// // 把删除按钮的行内 JavaScript 代码改为事件监听函数，写到单独的 JavaScript 文件里
+// var deleteButton = document.getElementById("del_btn"); // select the input element by id
+// deleteButton.addEventListener("click", function() { // add a click event listener
+//   return confirm("Are you sure?"); // show a confirmation dialog and return its result
+// });
+
+<!-- <a class="btn del-btn" data-movie-id="{{ movie.id }}">Delete</a> use a class and a data attribute instead of an id -->
+
+// // JavaScript file
+// window.addEventListener("DOMContentLoaded", function() {
+//     var deleteButtons = document.getElementsByClassName("del-btn"); // select all the elements with the del-btn class
+//     for (var i = 0; i < deleteButtons.length; i++) { // loop through the array-like object
+//       var deleteButton = deleteButtons[i]; // get the current element
+//       deleteButton.addEventListener("click", function() { // add a click event listener
+//         var xhr = new XMLHttpRequest(); // create a new XMLHttpRequest object
+//         var movieId = this.getAttribute("data-movie-id"); // get the movie id from the data attribute
+//         var url = "/delete/<movie_id>"; // use a placeholder in the URL
+//         url = url.replace("<movie_id>", movieId); // replace the placeholder with the actual movie id
+//         xhr.open("POST", url, true); // set up the request
+//         xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded"); // set the request header
+//         var data = "delete=Delete&movie_id=" + movieId; // prepare the data
+//         xhr.send(data); // send the request
+//         xhr.onload = function() { // handle the response
+//           if (xhr.status == 200) { // if successful
+//             alert("Movie deleted successfully!"); // show a message
+//             window.location.reload(); // reload the page
+//           } else { // if not successful
+//             alert("Something went wrong!"); // show an error message
+//           }
+//         };
+//       });
+//     }
+//   });
