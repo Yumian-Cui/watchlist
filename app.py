@@ -16,6 +16,8 @@ from flask_login import LoginManager
 from flask_login import UserMixin
 from flask_login import login_user
 from flask_login import login_required, logout_user, current_user
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Mail, Message
 
 # from views import views #import views from our views file
 # from models import db, User, Movie
@@ -39,6 +41,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的
 app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
 
 bootstrap = Bootstrap5(app)
+
+app.config['MAIL_SERVER'] = 'smtp.googlemail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER') # set your email with export EMAIL_USER=your-email-username in terminal
+app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS') # set your password with export EMAIL_PASS=your-email-password in terminal
+
+mail = Mail(app)
 
 # DO THIS AFTER initialized with the correct configuration!!!
 # db.init_app(app) # use the init_app method of the SQLAlchemy class to initialize the db object with the app object after it has been created
@@ -189,6 +199,7 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        email = request.form['email']
 
         if not username or not password:
             flash('Invalid input.')
@@ -199,17 +210,41 @@ def register():
             flash('Username already exists. Please log in.')
             return redirect(url_for('login'))
 
-        user = User(username=username)
+        user = User(username=username, email=email)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
 
-        login_user(user)  # log in the user
-        flash('Registration successful. You are now logged in.')
+        # New: Generate a confirmation token and send a confirmation email
+        s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+        token = s.dumps(email, salt='email-confirm')
+        confirm_token = EmailConfirmationToken(user_id=user.id, token=token)
+        db.session.add(confirm_token)
+        db.session.commit()
+        msg = Message('Confirm your email', sender='noreply@wl.com', recipients=[email])
+        msg.body = f'Please click the following link to confirm your email: {url_for("confirm_email", token=token, _external=True)}'
+        mail.send(msg)
+
+        # login_user(user)  # log in the user
+        flash('Registration successful. A confirmation email has been sent to your email address.')
         return redirect(url_for('index'))  # redirect to the main page
 
     return render_template('register.html')
 
+@app.route('/confirm-email/<token>')
+def confirm_email(token):
+    confirm_token = EmailConfirmationToken.query.filter_by(token=token).first()
+    if confirm_token and not confirm_token.used:
+        user = User.query.get(confirm_token.user_id)
+        user.email_confirmed = True
+        db.session.commit()
+        confirm_token.used = True
+        db.session.commit()
+        login_user(user)  # log in the user
+        flash('Your email has been confirmed. You are now logged in.')
+    else:
+        flash('Invalid or expired confirmation token.')
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 @login_required  # 用于视图保护，后面会详细介绍
@@ -269,7 +304,8 @@ class User(db.Model, UserMixin):  # 模型类是User,表名将会是 user（自�
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))  # 名字
     username = db.Column(db.String(20))  # 用户名
-    password_hash = db.Column(db.String(128))  # 密码散列值    
+    password_hash = db.Column(db.String(128))  # 密码散列值   
+    email = db.Column(db.String(120), unique=True) 
     movies = db.relationship('Movie', backref='user', lazy='dynamic') #将 User 表和 Movie 表建立关联 added a movies relationship to the User class, which will allow us to easily access all the movies associated with a specific user
 
     def set_password(self, password):  # 用来设置密码的方法，接受密码作为参数
@@ -279,6 +315,46 @@ class User(db.Model, UserMixin):  # 模型类是User,表名将会是 user（自�
         return check_password_hash(self.password_hash, password)  # 返回布尔值
 
 
+login_manager = LoginManager(app)  # 实例化扩展类
+
+@login_manager.user_loader
+def load_user(user_id):  # 创建用户加载回调函数，接受用户 ID 作为参数
+    user = User.query.get(int(user_id))  # 用 ID 作为 User 模型的主键查询对应的用户
+    return user  # 返回用户对象
+
+login_manager.login_view = 'login'
+login_manager.login_message = "You do not have access to that content. Please login first or contact administrator."
+
+class Movie(db.Model):  # 模型类是Movie, 表名将会是 movie
+    id = db.Column(db.Integer, primary_key=True)  # 主键
+    title = db.Column(db.String(60))  # 电影标题
+    year = db.Column(db.String(4))  # 电影年份
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id')) #将 User 表和 Movie 表建立关联 added a user_id column to the Movie table, which is a foreign key that references the id column in the User table
+
+class EmailConfirmationToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    token = db.Column(db.String(100))
+    used = db.Column(db.Boolean, default=False)
+
+
+# #https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/#one-to-many-relationships
+
+# from wtforms.validators import ValidationError
+
+# def validate_year(form, field):
+#     if field.data > datetime.now().year:
+#         raise ValidationError('Year cannot be after current year.')
+
+#Create a new class that inherits from FlaskForm:
+class MovieForm(FlaskForm):
+    title = StringField('title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
+    year = StringField('year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
+    # year = DateField('year', validators=[DataRequired()], format='%Y')
+    submit = SubmitField()
+
+# END CLASS
+    
 # 编写一个命令来创建管理员账户
 @app.cli.command()
 @click.option('--username', prompt=True, help='The username used to login.')
@@ -310,39 +386,6 @@ def delusers():
     db.session.commit()
 
     click.echo(f'Deleted {num_deleted} users.')
-
-login_manager = LoginManager(app)  # 实例化扩展类
-
-@login_manager.user_loader
-def load_user(user_id):  # 创建用户加载回调函数，接受用户 ID 作为参数
-    user = User.query.get(int(user_id))  # 用 ID 作为 User 模型的主键查询对应的用户
-    return user  # 返回用户对象
-
-login_manager.login_view = 'login'
-login_manager.login_message = "You do not have access to that content. Please login first or contact administrator."
-
-class Movie(db.Model):  # 模型类是Movie, 表名将会是 movie
-    id = db.Column(db.Integer, primary_key=True)  # 主键
-    title = db.Column(db.String(60))  # 电影标题
-    year = db.Column(db.String(4))  # 电影年份
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id')) #将 User 表和 Movie 表建立关联 added a user_id column to the Movie table, which is a foreign key that references the id column in the User table
-
-# #https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/#one-to-many-relationships
-
-# from wtforms.validators import ValidationError
-
-# def validate_year(form, field):
-#     if field.data > datetime.now().year:
-#         raise ValidationError('Year cannot be after current year.')
-
-#Create a new class that inherits from FlaskForm:
-class MovieForm(FlaskForm):
-    title = StringField('title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
-    year = StringField('year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
-    # year = DateField('year', validators=[DataRequired()], format='%Y')
-    submit = SubmitField()
-
-# END CLASS
 
 #==========================================================================
 
