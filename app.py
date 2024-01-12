@@ -126,12 +126,13 @@ def index():
         title = form.title.data
         year = form.year.data
         # Add movie to database here...
-        movie = Movie(title=title, year=year)  # 创建记录
+        movie = Movie(title=title, year=year, user_id=current_user.id)  # 创建记录
         db.session.add(movie)  # 添加到数据库会话
         db.session.commit()  # 提交数据库会话
         flash('Item created.')  # 显示成功创建的提示
         return redirect(url_for('index'))
-    movies = Movie.query.all()
+    movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
+    # movies = Movie.query.all()
     return render_template('index.html', movies=movies, form=form)
 
 @app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
@@ -165,8 +166,13 @@ def login():
         if not username or not password:
             flash('Invalid input.')
             return redirect(url_for('login'))
+        
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            flash('User does not exist.')
+            return redirect(url_for('register'))
 
-        user = User.query.first()
+        # user = User.query.first()
         # 验证用户名和密码是否一致
         if username == user.username and user.validate_password(password):
             login_user(user)  # 登入用户
@@ -177,6 +183,33 @@ def login():
         return redirect(url_for('login'))  # 重定向回登录页面
 
     return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Invalid input.')
+            return redirect(url_for('register'))
+
+        user = User.query.filter_by(username=username).first()
+        if user is not None:
+            flash('Username already exists. Please log in.')
+            return redirect(url_for('login'))
+
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        login_user(user)  # log in the user
+        flash('Registration successful. You are now logged in.')
+        return redirect(url_for('index'))  # redirect to the main page
+
+    return render_template('register.html')
+
 
 @app.route('/logout')
 @login_required  # 用于视图保护，后面会详细介绍
