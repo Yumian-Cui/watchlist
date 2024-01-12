@@ -2,6 +2,8 @@
 sqlalchemy.exc.OperationalError。
 
 to activate env: . env/Scripts/activate
+to start the app in test mode: flask run
+
 
 Gave up 10/19: 你可以把删除按钮的行内 JavaScript 代码改为事件监听函数，写到单独的 JavaScript 文件里。再进一步，你也可以使用 JavaScript 来监听点击删除按钮的动作，并发送删除条目的 POST 请求，这样删除按钮就可以使用普通 <a> 标签（CSRF 令牌存储在元素属性里），而不用创建表单元素。
 
