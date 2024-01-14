@@ -270,23 +270,33 @@ def logout():
     return redirect(url_for('index'))  # 重定向回首页
 
 #设置页面，支持修改用户的名字
+#支持用户删除账户
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
     if request.method == 'POST':
-        name = request.form['name']
+        if 'confirm_delete' in request.form:
+            # User confirmed deletion
+            db.session.delete(current_user)
+            db.session.commit()
+            logout_user()
+            flash('Your account has been deleted.')
+            # return redirect(url_for('index'))
+        else:
+            name = request.form['name']
 
-        if not name or len(name) > 20:
-            flash('Invalid input.')
-            return redirect(url_for('settings'))
+            if not name or len(name) > 20:
+                flash('Invalid input.')
+                return redirect(url_for('settings'))
 
-        current_user.name = name
-        # current_user 会返回当前登录用户的数据库记录对象
-        # 等同于下面的用法
-        # user = User.query.first()
-        # user.name = name
-        db.session.commit()
-        flash('Settings updated.')
+            current_user.name = name
+            # current_user 会返回当前登录用户的数据库记录对象
+            # 等同于下面的用法
+            # user = User.query.first()
+            # user.name = name
+            db.session.commit()
+            flash('Settings updated.')
+            # return redirect(url_for('index'))
         return redirect(url_for('index'))
 
     return render_template('settings.html')

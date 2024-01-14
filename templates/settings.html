@@ -2,8 +2,12 @@
 
 {% block content %}
 <h3>Settings</h3>
-<form method="post">
+<form method="post" style="margin-bottom: 20px;">
     Your Name <input type="text" name="name" autocomplete="off" required value="{{ current_user.name }}">
     <input class="btn" type="submit" name="submit" value="Save">
+</form>
+<form method="post">
+    <p style="font-weight: bold;">Delete your account (irreversible):</p>
+    <input class="btn" type="submit" name="confirm_delete" value="Delete Account" onclick="return confirm('Are you sure?')">
 </form>
 {% endblock %}
