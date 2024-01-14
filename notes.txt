@@ -1,9 +1,38 @@
 当你在一个新PC上时，你需要保证你的Flask和pip是最新的，在Windows可能会报错Fatal error in launcher，强制你在每个指令前加上python -m。你还需要保证重新创建database用相应的指令，不然会报错OperationalError
 sqlalchemy.exc.OperationalError。
 
-to activate env: . env/Scripts/activate
+IMPORTANT!!!
+conda activate watchlist
+to activate env (windows): . env/Scripts/activate
+to activate env (mac/linux): . env/bin/activate 
 to start the app in test mode: flask run
 
+Seems that you need to redo below steps upon changing to a new computer:
+pip install flask flask_sqlalchemy flask_wtf wtforms flask_bootstrap flask_login flask_mail flask_migrate
+pip install -U Werkzeug
+pip install -U bootstrap-flask
+
+flask db init
+flask db migrate
+flask db upgrade
+
+Delete all users:
+1. flask shell
+2. from app import db, User
+3. User.query.delete()
+4. db.session.commit()
+5. exit()
+
+Name: wl-demo
+sender: wldemo.noreply@gmail.com
+
+
+
+1/12: AttributeError: module 'hashlib' has no attribute 'scrypt': by following this:
+brew install openssl
+echo 'export PATH="/usr/local/opt/openssl/bin:$PATH"' >> ~/.bash_profile
+source ~/.bash_profile
+and create a new env and reinstall every dependencies 
 
 Gave up 10/19: 你可以把删除按钮的行内 JavaScript 代码改为事件监听函数，写到单独的 JavaScript 文件里。再进一步，你也可以使用 JavaScript 来监听点击删除按钮的动作，并发送删除条目的 POST 请求，这样删除按钮就可以使用普通 <a> 标签（CSRF 令牌存储在元素属性里），而不用创建表单元素。
 

@@ -11,7 +11,7 @@ from datetime import datetime
 from wtforms import widgets
 from flask_bootstrap import Bootstrap5
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_migrate import Migrate
+from flask_migrate import Migrate # pip install -U bootstrap-flask
 from flask_login import LoginManager
 from flask_login import UserMixin
 from flask_login import login_user
@@ -42,9 +42,10 @@ app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
 
 bootstrap = Bootstrap5(app)
 
-app.config['MAIL_SERVER'] = 'smtp.googlemail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_SERVER'] = 'smtp.gmail.com' # smtp.live.com
+app.config['MAIL_PORT'] =  465 #587
+# app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER') # set your email with export EMAIL_USER=your-email-username in terminal
 app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS') # set your password with export EMAIL_PASS=your-email-password in terminal
 
@@ -209,24 +210,39 @@ def register():
         if user is not None:
             flash('Username already exists. Please log in.')
             return redirect(url_for('login'))
+        
+        # Check if the email already exists
+        user = User.query.filter_by(email=email).first()
+        if user is not None:
+            flash('Email already exists. Please use another one.')
+            return redirect(url_for('register'))
 
         user = User(username=username, email=email)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
 
-        # New: Generate a confirmation token and send a confirmation email
+        # Generate a confirmation token and send a confirmation email
         s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
         token = s.dumps(email, salt='email-confirm')
         confirm_token = EmailConfirmationToken(user_id=user.id, token=token)
         db.session.add(confirm_token)
-        db.session.commit()
-        msg = Message('Confirm your email', sender='noreply@wl.com', recipients=[email])
-        msg.body = f'Please click the following link to confirm your email: {url_for("confirm_email", token=token, _external=True)}'
-        mail.send(msg)
-
+        # this try except logic might be revised in the future. 
+        try:
+            db.session.commit()
+            msg = Message('Confirm your email', sender='noreply@wl.com', recipients=[email])
+            msg.body = f'Please click the following link to confirm your email: {url_for("confirm_email", token=token, _external=True)}'
+            mail.send(msg)
+            flash('Registration successful. A confirmation email has been sent to your email address.')
+        except Exception as e:
+            # If sending the email fails, delete the user and the token from the database
+            db.session.delete(confirm_token)
+            db.session.delete(user)
+            db.session.commit()
+            flash('Error sending confirmation email. Please try again.')
+            return redirect(url_for('register'))           
+        
         # login_user(user)  # log in the user
-        flash('Registration successful. A confirmation email has been sent to your email address.')
         return redirect(url_for('index'))  # redirect to the main page
 
     return render_template('register.html')
