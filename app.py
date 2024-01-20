@@ -1,12 +1,12 @@
-import os, sys, click
+import os, sys, click, re
 
 from flask import Flask, render_template, flash, redirect, request
 from markupsafe import escape
 from flask import url_for
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SubmitField, DateField
-from wtforms.validators import DataRequired, Length
+from wtforms import StringField, IntegerField, SubmitField, DateField, PasswordField
+from wtforms.validators import DataRequired, Length, Email
 from datetime import datetime
 from wtforms import widgets
 from flask_bootstrap import Bootstrap5
@@ -18,9 +18,27 @@ from flask_login import login_user
 from flask_login import login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
+# from wtforms import Field as BaseField
+# from flask_security import UserMixin
+# from flask_security import Security, SQLAlchemyUserDatastore, \
+#     UserMixin, RoleMixin, login_required
+# from flask_security.forms import LoginForm
 
 # from views import views #import views from our views file
 # from models import db, User, Movie
+
+from wtforms import StringField as BaseStringField, PasswordField as BasePasswordField, Field as BaseField
+
+class Field(BaseField):
+    def __init__(self, label=None, validators=None, **kwargs):
+        kwargs.setdefault('render_kw', {}).setdefault('class', 'form-field')
+        super().__init__(label, validators, **kwargs)
+
+class AuthStringField(Field, BaseStringField):
+    pass
+
+class AuthPasswordField(Field, BasePasswordField):
+    pass
 
 # ******************************************** APP ********************************************
 
@@ -49,6 +67,7 @@ app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER') # set your email with export EMAIL_USER=your-email-username in terminal
 app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS') # set your password with export EMAIL_PASS=your-email-password in terminal
 
+
 mail = Mail(app)
 
 # DO THIS AFTER initialized with the correct configuration!!!
@@ -56,6 +75,9 @@ mail = Mail(app)
 
 db = SQLAlchemy(app)  # 初始化扩展，传入程序实例 app
 migrate = Migrate(app, db) # https://github.com/miguelgrinberg/Flask-Migrate
+
+app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = ('username','email')
+
 
 @app.context_processor
 def inject_user():  # 函数名可以随意修改
@@ -170,82 +192,97 @@ def delete(movie_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    form = LoginForm()
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        if form.validate_on_submit():
+            identifier = form.identifier.data
+            password = form.password.data
 
-        if not username or not password:
-            flash('Invalid input.')
-            return redirect(url_for('login'))
-        
-        user = User.query.filter_by(username=username).first()
-        if user is None:
-            flash('User does not exist.')
-            return redirect(url_for('register'))
+            if not identifier or not password:
+                flash('Invalid input.')
+                return redirect(url_for('login'))
+            
+            # Check if identifier is a username or an email
+            user = User.query.filter((User.username == identifier) | (User.email == identifier)).first()
+            if user is None:
+                flash('User does not exist.')
+                return redirect(url_for('register'))
+            
+            # Validate the password
+            if user.validate_password(password):
+                login_user(user)  # Log in the user
+                flash('Login success.')
+                return redirect(url_for('index'))  # Redirect to the home page
+            
+            flash('Invalid username/email or password.')  # If validation fails, display an error message
+            
+            return redirect(url_for('login'))  # 重定向回登录页面
+            
+            # regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            # is_email = True if re.fullmatch(regex, identifier) else False
+
+            # if is_email:
+            #     user = User.query.filter_by(email=identifier).first()
+            # else:
+
 
         # user = User.query.first()
         # 验证用户名和密码是否一致
-        if username == user.username and user.validate_password(password):
-            login_user(user)  # 登入用户
-            flash('Login success.')
-            return redirect(url_for('index'))  # 重定向到主页
+        # if username == user.username and user.validate_password(password):
+        #     login_user(user)  # 登入用户
+        #     flash('Login success.')
+        #     return redirect(url_for('index'))  # 重定向到主页
 
-        flash('Invalid username or password.')  # 如果验证失败，显示错误消息
-        return redirect(url_for('login'))  # 重定向回登录页面
+        # flash('Invalid username or password.')  # 如果验证失败，显示错误消息
+        # return redirect(url_for('login'))  # 重定向回登录页面
 
-    return render_template('login.html')
+    return render_template('login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    form = RegisterForm()
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        email = request.form['email']
+        if form.validate_on_submit():
+            username = form.username.data
+            password = form.password.data
+            email = form.email.data
 
-        if not username or not password:
-            flash('Invalid input.')
-            return redirect(url_for('register'))
+            user = User.query.filter_by(username=username).first()
+            if user is not None:
+                flash('Username already exists. Please log in.')
+                return redirect(url_for('login'))
+            
+            # Check if the email already exists
+            user = User.query.filter_by(email=email).first()
+            if user is not None:
+                flash('Email already exists. Please use another one.')
+                return redirect(url_for('register'))
 
-        user = User.query.filter_by(username=username).first()
-        if user is not None:
-            flash('Username already exists. Please log in.')
-            return redirect(url_for('login'))
-        
-        # Check if the email already exists
-        user = User.query.filter_by(email=email).first()
-        if user is not None:
-            flash('Email already exists. Please use another one.')
-            return redirect(url_for('register'))
-
-        user = User(username=username, email=email)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-
-        # Generate a confirmation token and send a confirmation email
-        s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-        token = s.dumps(email, salt='email-confirm')
-        confirm_token = EmailConfirmationToken(user_id=user.id, token=token)
-        db.session.add(confirm_token)
-        # this try except logic might be revised in the future. 
-        try:
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
             db.session.commit()
-            msg = Message('Confirm your email', sender='noreply@wl.com', recipients=[email])
-            msg.body = f'Please click the following link to confirm your email: {url_for("confirm_email", token=token, _external=True)}'
-            mail.send(msg)
-            flash('Registration successful. A confirmation email has been sent to your email address.')
-        except Exception as e:
-            # If sending the email fails, delete the user and the token from the database
-            db.session.delete(confirm_token)
-            db.session.delete(user)
-            db.session.commit()
-            flash('Error sending confirmation email. Please try again.')
-            return redirect(url_for('register'))           
-        
-        # login_user(user)  # log in the user
-        return redirect(url_for('index'))  # redirect to the main page
 
-    return render_template('register.html')
+            # Generate a confirmation token and send a confirmation email
+            # this try except logic might be revised in the future. 
+            try:
+                token = generate_confirmation_token(email, user.id)
+                send_email_confirmation(email, token)
+                flash('Registration successful. A confirmation email has been sent to your email address.')
+            except Exception as e:
+                # If sending the email fails, delete the user and the token from the database
+                confirm_token = EmailConfirmationToken.query.filter_by(user_id=user.id).first()
+                if confirm_token:
+                    db.session.delete(confirm_token)
+                db.session.delete(user)
+                db.session.commit()
+                flash('Error sending confirmation email. Please try again.')
+                return redirect(url_for('register'))           
+        
+            # login_user(user)  # log in the user
+            return redirect(url_for('login'))  # redirect to the main page
+
+    return render_template('register.html', form=form)
 
 @app.route('/confirm-email/<token>')
 def confirm_email(token):
@@ -256,11 +293,72 @@ def confirm_email(token):
         db.session.commit()
         confirm_token.used = True
         db.session.commit()
-        login_user(user)  # log in the user
-        flash('Your email has been confirmed. You are now logged in.')
+        # login_user(user)  # log in the user
+        flash('Your email has been confirmed. You can now log in.')
+        return redirect(url_for('login'))
     else:
         flash('Invalid or expired confirmation token.')
     return redirect(url_for('index'))
+
+def generate_confirmation_token(email, user_id):
+    s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    token = s.dumps(email, salt='email-confirm')
+    
+    # Associate the token with the user and store it in the database
+    confirm_token = EmailConfirmationToken(user_id=user_id, token=token)
+    db.session.add(confirm_token)
+    db.session.commit()
+
+    return token
+
+def send_email_confirmation(email, token):
+    """
+    Send a confirmation email to the given address.
+
+    Args:
+    email (str): The recipient's email address.
+    token (str): The confirmation token to be included in the email.
+    """
+    msg = Message('Confirm your email', sender='noreply@wl.com', recipients=[email])
+    msg.body = f"""\
+Hello,
+
+You're receiving this email because you've either registered a new account with us or prompted an email confirmation link.
+
+Please click the following link to confirm your email address: {url_for('confirm_email', token=token, _external=True)}. You will then be redirected to login.
+
+If you did not request this email, you can safely ignore it.
+
+Best,
+Watchlist App Team
+    """
+    mail.send(msg)
+
+# One shouldn't need to request their username: they need to retrieve username based on email; if they remember email then they
+# can log in with their unique email identifier
+
+@app.route('/find_username', methods=['GET', 'POST'])
+def find_username():
+    if request.method == 'POST':
+        email = request.form['email']
+        user = User.query.filter_by(email=email).first()
+        if user:
+            if user.email_confirmed:
+                flash('Email confirmed already. You may now log in using your email and find your username in the settings.')
+                return redirect(url_for('login'))
+            else:
+                token = generate_confirmation_token(email, user.id)
+                send_email_confirmation(email, token)
+                flash('Your email is registered but not confirmed. Please confirm it via your inbox, log in with your email and find your username in the settings.')
+        else:
+            flash('No account found with that email.')
+        return redirect(url_for('find_username'))
+    return render_template('find_username.html')
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    # TODO
+    return
 
 @app.route('/logout')
 @login_required  # 用于视图保护，后面会详细介绍
@@ -282,22 +380,38 @@ def settings():
             logout_user()
             flash('Your account has been deleted.')
             # return redirect(url_for('index'))
-        else:
-            name = request.form['name']
 
-            if not name or len(name) > 20:
-                flash('Invalid input.')
-                return redirect(url_for('settings'))
+        # A dictionary to store the form fields that can be updated
+        updatable_fields = {
+            'name': {
+                'max_length': 20,
+                'error_message': 'Invalid name.'
+            },
+            'username': {
+                'max_length': 20,
+                'error_message': 'Invalid username.'
+            }
+        }
 
-            current_user.name = name
-            # current_user 会返回当前登录用户的数据库记录对象
-            # 等同于下面的用法
-            # user = User.query.first()
-            # user.name = name
-            db.session.commit()
-            flash('Settings updated.')
-            # return redirect(url_for('index'))
+        updated_fields = []
+        for field, info in updatable_fields.items():
+            value = request.form.get(field)
+            if value:  # Check if the field value is not empty
+                if len(value) <= info['max_length']:
+                    setattr(current_user, field, value)
+                    updated_fields.append(field)
+                else:
+                    flash(info['error_message'])
+                    return redirect(url_for('settings'))
+
+        db.session.commit()
+        flash('Settings updated: ' + ', '.join(updated_fields) + '.')
         return redirect(url_for('index'))
+
+        # current_user 会返回当前登录用户的数据库记录对象
+        # 等同于下面的用法
+        # user = User.query.first()
+        # user.name = name
 
     return render_template('settings.html')
 
@@ -332,6 +446,7 @@ class User(db.Model, UserMixin):  # 模型类是User,表名将会是 user（自�
     username = db.Column(db.String(20))  # 用户名
     password_hash = db.Column(db.String(128))  # 密码散列值   
     email = db.Column(db.String(120), unique=True) 
+    email_confirmed = db.Column(db.Boolean, default=False)
     movies = db.relationship('Movie', backref='user', lazy='dynamic') #将 User 表和 Movie 表建立关联 added a movies relationship to the User class, which will allow us to easily access all the movies associated with a specific user
 
     def set_password(self, password):  # 用来设置密码的方法，接受密码作为参数
@@ -339,6 +454,7 @@ class User(db.Model, UserMixin):  # 模型类是User,表名将会是 user（自�
 
     def validate_password(self, password):  # 用于验证密码的方法，接受密码作为参数
         return check_password_hash(self.password_hash, password)  # 返回布尔值
+    
 
 
 login_manager = LoginManager(app)  # 实例化扩展类
@@ -374,12 +490,37 @@ class EmailConfirmationToken(db.Model):
 
 #Create a new class that inherits from FlaskForm:
 class MovieForm(FlaskForm):
-    title = StringField('title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
-    year = StringField('year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
+    title = StringField('Title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
+    year = StringField('Year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
     # year = DateField('year', validators=[DataRequired()], format='%Y')
     submit = SubmitField()
 
 # END CLASS
+# Assuming 'User' is your user model and it includes the fields 'email' and 'password'
+# class ExtendedLoginForm(LoginForm):
+#     identifier = StringField('Username or Email', [DataRequired()])
+#     # password = PasswordField('Password', validators=[DataRequired()])
+#     # submit = SubmitField('Log In')
+
+# Setup Flask-Security
+# user_datastore = SQLAlchemyUserDatastore(db, User)
+# security = Security(app, user_datastore, login_form=ExtendedLoginForm)
+
+# Authentification form fields follow a different styling than MovieForm
+class LoginForm(FlaskForm):
+    identifier = AuthStringField('Username or Email', validators=[DataRequired()])
+    password = AuthPasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Log In')
+
+class RegisterForm(FlaskForm):
+    username = AuthStringField('Username', validators=[DataRequired()])
+    email = AuthStringField('Email', validators=[DataRequired(), Email()])
+    password = AuthPasswordField('Password', validators=[DataRequired()])
+    create = SubmitField('Create')
+
+
+
+
     
 # 编写一个命令来创建管理员账户
 @app.cli.command()

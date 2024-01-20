@@ -2,13 +2,9 @@
 
 {% block content %}
 <h3>Login</h3>
-<form method="post">
-    Username<br>
-    <input type="text" name="username" required><br><br>
-    Password<br>
-    <!-- 密码输入框的 type 属性使用 password，会将输入值显示为圆点 -->
-    <input type="password" name="password" required><br><br>
-    <input class="btn" type="submit" name="submit" value="Submit">
-</form>
+{{ render_form(form) }}
+Forgot your <a href="{{ url_for('find_username') }}">username</a> or <a href="{{ url_for('reset_password') }}">password</a>?
 <p>Don't have an account? <a href="{{ url_for('register') }}">Create your account here</a>.</p>
 {% endblock %}
+
+

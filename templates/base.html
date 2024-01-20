@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
         {% if current_user.is_authenticated %}
-            {{ current_user.username }}'s Watchlist
+            {{ current_user.username.capitalize() }}'s Watchlist
         {% else %}
             Unknown's Watchlist
         {% endif %}

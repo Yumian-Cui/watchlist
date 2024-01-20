@@ -3,7 +3,15 @@
 {% block content %}
 <h3>Settings</h3>
 <form method="post" style="margin-bottom: 20px;">
-    Your Name <input type="text" name="name" autocomplete="off" required value="{{ current_user.name }}">
+    Name <input type="text" name="name" autocomplete="off" required value="{{ current_user.name }}">
+    <input class="btn" type="submit" name="submit" value="Save">
+</form>
+<form method="post" style="margin-bottom: 20px;">
+    Username <input type="text" name="username" autocomplete="off" required value="{{ current_user.username }}">
+    <input class="btn" type="submit" name="submit" value="Save">
+</form>
+<form method="post" style="margin-bottom: 20px;">
+    Email <input type="text" name="email" autocomplete="off" required value="{{ current_user.email }}">
     <input class="btn" type="submit" name="submit" value="Save">
 </form>
 <form method="post">

@@ -131,3 +131,14 @@ input[name=year] {
 .inline-form {
     display: inline;
 }
+
+.form-field {
+    display: block;
+    width: 30%;  /* Reduce the width */
+    padding: 4px 10px;  /* Reduce the padding */
+    font-size: 14px;
+    margin: 4px 0;  /* Reduce the margin */
+    box-sizing: border-box;
+    border: 1px solid #ccc;  /* Reduce the border thickness */
+    border-radius: 2px;  /* Reduce the border radius */
+}

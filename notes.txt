@@ -1,3 +1,5 @@
+Progress: I have a test2 username and password 123 account for testing purpose. Registered my personal email. 
+test username and password 123 with wisc email
 当你在一个新PC上时，你需要保证你的Flask和pip是最新的，在Windows可能会报错Fatal error in launcher，强制你在每个指令前加上python -m。你还需要保证重新创建database用相应的指令，不然会报错OperationalError
 sqlalchemy.exc.OperationalError。
 
@@ -6,13 +8,21 @@ conda activate watchlist
 to activate env (windows): . env/Scripts/activate
 to activate env (mac/linux): . env/bin/activate 
 to start the app in test mode: flask run
+export EMAIL_USER='wldemo.noreply@gmail.com'
+export EMAIL_PASS='watchlist app password'
 
 Seems that you need to redo below steps upon changing to a new computer:
 pip install flask flask_sqlalchemy flask_wtf wtforms flask_bootstrap flask_login flask_mail flask_migrate
 pip install -U Werkzeug
 pip install -U bootstrap-flask
+pip install flask-security (N/A)
+pip install email_validator
 
-flask db init
+I need to user python3 to start python shell in terminal, which is a bit annoying.
+
+
+flask db init [Run this first time you create your application]
+[Below run it everytime you update your models]
 flask db migrate
 flask db upgrade
 
@@ -23,11 +33,40 @@ Delete all users:
 4. db.session.commit()
 5. exit()
 
+Add attributes after updating the model:
+1. flask shell
+2. from app import db, User
+3. users = User.query.all()
+4. >>> for user in users:
+...     if not hasattr(user, 'email_confirmed'):
+...         user.email_confirmed = False
+...
+[for this, you need to copy each line with indentation, and press Enter]
+[Use quit() or Ctrl-D (i.e. EOF) to exit]
+5. db.session.commit()
+
 Name: wl-demo
 sender: wldemo.noreply@gmail.com
 https://stackoverflow.com/questions/37058567/configure-flask-mail-to-use-gmail
 https://domar.com/pages/smtp_pop3_server
 
+Email Confirmation: Sending a confirmation email that contains a link for the user to click is a standard way to confirm an email address. When the user clicks the link, you can mark their email as confirmed in your system.
+
+Access to Features: You can allow users to access certain features of your application even if they haven’t confirmed their email address. However, any features that involve sending emails to the user should require email confirmation. This includes any notifications, password reset links, or other sensitive information.
+
+Reminders: If a user doesn’t confirm their email address, you can periodically remind them to do so. This could be a message displayed when they log in, or a reminder sent to their email address.
+
+Account Deletion: Some applications choose to delete accounts that haven’t confirmed their email address after a certain period of time. This can help keep your user database clean.
+
+Resend Confirmation Link: It’s a good idea to provide an option for users to resend the confirmation link in case they didn’t receive it or it expired.
+
+--- 
+Thoughts: "Limited Access Until Confirmation" -> For any email-sending features, disable it until the user has confirmed their email. 
+Restrict Access Until Confirmation: Some applications do not allow users to log in until they have confirmed their email address. This is often the case for applications where email is a critical part of the user interaction, such as those involving financial transactions, sensitive data, or important notifications.
+
+Limited Access Until Confirmation: Other applications allow users to log in immediately after registration, but limit access to certain features until the email address has been confirmed. This is a common practice in applications where not all features require a verified email.
+
+Full Access with Reminder to Confirm: Some applications allow full access after registration, but continue to remind the user to confirm their email address. This is often seen in less critical applications or in cases where the user experience is prioritized over strict security measures.
 
 
 1/12: AttributeError: module 'hashlib' has no attribute 'scrypt': by following this:
