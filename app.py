@@ -18,6 +18,8 @@ from flask_login import login_user
 from flask_login import login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
+# from flask_security import Security, SQLAlchemyUserDatastore, \
+#     UserMixin, RoleMixin, login_required, utils
 # from wtforms import Field as BaseField
 # from flask_security import UserMixin
 # from flask_security import Security, SQLAlchemyUserDatastore, \
@@ -57,6 +59,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(app.root_path, 'da
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
 
 app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
+s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 bootstrap = Bootstrap5(app)
 
@@ -203,10 +206,17 @@ def login():
                 return redirect(url_for('login'))
             
             # Check if identifier is a username or an email
+            is_email = User.email == identifier
             user = User.query.filter((User.username == identifier) | (User.email == identifier)).first()
             if user is None:
                 flash('User does not exist.')
                 return redirect(url_for('register'))
+            
+            if is_email and not user.email_confirmed:
+                flash('Email registered but not confirmed. A new confirmation has been sent. Please confirm it via your inbox first.')
+                token = generate_confirmation_token(user.email, user.id)
+                send_email_confirmation(user.email, token)
+                return redirect(url_for('login'))
             
             # Validate the password
             if user.validate_password(password):
@@ -276,7 +286,7 @@ def register():
                     db.session.delete(confirm_token)
                 db.session.delete(user)
                 db.session.commit()
-                flash('Error sending confirmation email. Please try again.')
+                flash('Error sending confirmation email. Please try again.' + str(e))
                 return redirect(url_for('register'))           
         
             # login_user(user)  # log in the user
@@ -301,7 +311,7 @@ def confirm_email(token):
     return redirect(url_for('index'))
 
 def generate_confirmation_token(email, user_id):
-    s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    # s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
     token = s.dumps(email, salt='email-confirm')
     
     # Associate the token with the user and store it in the database
@@ -334,6 +344,51 @@ Watchlist App Team
     """
     mail.send(msg)
 
+
+def send_password_reset(email, token):
+    msg = Message('Reset your password', sender='noreply@wl.com', recipients=[email])
+    msg.body = f"""\
+Hello,
+
+You're receiving this email because you've requested a password reset.
+
+Please click the following link to reset: {url_for('reset_password_helper', token=token, _external=True)}.
+
+If you did not request this email, you can safely ignore it.
+
+Best,
+Watchlist App Team
+    """
+    mail.send(msg)  
+
+@app.route('/reset_password/<token>', methods=["GET", "POST"])
+def reset_password_helper(token):
+    form = ResetPasswordForm()
+    if request.method == "POST":
+        if form.validate_on_submit():
+            try:
+                # Attempt to load the email from the token
+                email = s.loads(token, salt='reset-password', max_age=3600)  # Token is valid for 1 hour
+            except Exception as e:
+                flash("The password reset link is invalid or has expired.")
+                return redirect(url_for('reset_password'))
+            user = User.query.filter_by(email=email).first()
+            new_password = form.new_password.data
+            confirm_password = form.confirm_password.data
+            if user:
+                if new_password == confirm_password:  # check if both passwords match
+                    user.set_password(new_password)
+                    db.session.commit()
+                    flash("Your password has been reset.")
+                    # login_user(user)
+                    return redirect(url_for('login'))
+                else:
+                    flash("Passwords do not match.")  # return an error message if passwords do not match
+            else:
+                flash("Invalid token or email address.")
+    return render_template('reset_password_helper.html', form=form)
+
+
 # One shouldn't need to request their username: they need to retrieve username based on email; if they remember email then they
 # can log in with their unique email identifier
 
@@ -355,10 +410,23 @@ def find_username():
         return redirect(url_for('find_username'))
     return render_template('find_username.html')
 
-@app.route('/reset-password', methods=['GET', 'POST'])
+@app.route('/reset_password', methods=["GET", "POST"])
 def reset_password():
-    # TODO
-    return
+    if request.method == "POST":
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = s.dumps(email, salt='reset-password')
+            # ... send `token` to user's email address ...
+            try:
+                send_password_reset(email, token)
+            except:
+                flash('Error sending reset email. Please try again.')
+                redirect(url_for('reset_password'))
+            flash("Please check your email for a password reset link.")
+        else:
+            flash("Email address not found.")
+    return render_template('reset_password.html')
 
 @app.route('/logout')
 @login_required  # 用于视图保护，后面会详细介绍
@@ -389,7 +457,13 @@ def settings():
             },
             'username': {
                 'max_length': 20,
-                'error_message': 'Invalid username.'
+                'error_message': 'Invalid username.',
+                'unique_error_message': 'Username already exists.'
+            },
+            'email': {
+                'max_length': 50,
+                'error_message': 'Invalid email.',
+                'unique_error_message': 'Email already exists.'
             }
         }
 
@@ -398,15 +472,25 @@ def settings():
             value = request.form.get(field)
             if value:  # Check if the field value is not empty
                 if len(value) <= info['max_length']:
-                    setattr(current_user, field, value)
-                    updated_fields.append(field)
+                    # Check if the field is unique
+                    if User.query.filter_by(**{field: value}).first() is None:
+                        setattr(current_user, field, value)
+                        updated_fields.append(field)
+                        if field == 'email':
+                            # Generate a confirmation token and send a confirmation email
+                            token = generate_confirmation_token(value, current_user.id)
+                            send_email_confirmation(value, token)
+                            flash('A confirmation email has been sent to your new email address.')
+                    else:
+                        flash(info['unique_error_message'])
+                        return redirect(url_for('settings'))
                 else:
                     flash(info['error_message'])
                     return redirect(url_for('settings'))
 
         db.session.commit()
         flash('Settings updated: ' + ', '.join(updated_fields) + '.')
-        return redirect(url_for('index'))
+        # return redirect(url_for('index'))
 
         # current_user 会返回当前登录用户的数据库记录对象
         # 等同于下面的用法
@@ -414,6 +498,8 @@ def settings():
         # user.name = name
 
     return render_template('settings.html')
+
+
 
 @app.route('/user/<name>')
 def user_page(name):
@@ -443,7 +529,7 @@ def test_url_for():
 class User(db.Model, UserMixin):  # 模型类是User,表名将会是 user（自动生成，小写处理）
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))  # 名字
-    username = db.Column(db.String(20))  # 用户名
+    username = db.Column(db.String(20),unique=True)  # 用户名
     password_hash = db.Column(db.String(128))  # 密码散列值   
     email = db.Column(db.String(120), unique=True) 
     email_confirmed = db.Column(db.Boolean, default=False)
@@ -517,6 +603,13 @@ class RegisterForm(FlaskForm):
     email = AuthStringField('Email', validators=[DataRequired(), Email()])
     password = AuthPasswordField('Password', validators=[DataRequired()])
     create = SubmitField('Create')
+
+class ResetPasswordForm(FlaskForm):
+    new_password = AuthPasswordField('New Password', validators=[DataRequired()])
+    confirm_password = AuthPasswordField('Confirm Password', validators=[DataRequired()])
+    reset = SubmitField('Reset')
+
+# class SettingForm(FlaskForm):
 
 
 

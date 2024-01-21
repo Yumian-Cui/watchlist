@@ -1,7 +1,14 @@
 Progress: I have a test2 username and password 123 account for testing purpose. Registered my personal email. 
-test username and password 123 with wisc email
+test username and password 1234 with wisc email
+
+import flask-security will have conflict with flask-login
+
+my table user is mysteriously not found 1/20/24, which is concerning because that meant my database is corrupted some way and 
+I don't know why. I used flask db migrate and flask db upgrade but it just erased everything including the old data. I don't where it all went.
 当你在一个新PC上时，你需要保证你的Flask和pip是最新的，在Windows可能会报错Fatal error in launcher，强制你在每个指令前加上python -m。你还需要保证重新创建database用相应的指令，不然会报错OperationalError
 sqlalchemy.exc.OperationalError。
+
+nano .gitignore
 
 IMPORTANT!!!
 conda activate watchlist
@@ -44,6 +51,9 @@ Add attributes after updating the model:
 [for this, you need to copy each line with indentation, and press Enter]
 [Use quit() or Ctrl-D (i.e. EOF) to exit]
 5. db.session.commit()
+
+https://stackoverflow.com/questions/23039734/flask-login-password-reset
+https://flask-security-too.readthedocs.io/en/stable/index.html
 
 Name: wl-demo
 sender: wldemo.noreply@gmail.com

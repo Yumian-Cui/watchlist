@@ -1,3 +1,4 @@
+Now have 1 record: email personal gmail, username ycui53, mima 1234
 Refactor the functions - split app.py into a few files to make things modularized and manageable
 Implement Reset password functionality
 Solve the problem where you have to reinstall every dependencies upon switching computers, maybe write a requirements file? 
