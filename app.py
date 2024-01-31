@@ -376,14 +376,17 @@ def reset_password_helper(token):
             new_password = form.new_password.data
             confirm_password = form.confirm_password.data
             if user:
-                if new_password == confirm_password:  # check if both passwords match
-                    user.set_password(new_password)
-                    db.session.commit()
-                    flash("Your password has been reset.")
-                    # login_user(user)
-                    return redirect(url_for('login'))
+                if not user.validate_password(new_password):
+                    if new_password == confirm_password:  # check if both passwords match
+                        user.set_password(new_password)
+                        db.session.commit()
+                        flash("Your password has been reset.")
+                        # login_user(user)
+                        return redirect(url_for('login'))
+                    else:
+                        flash("Passwords do not match.")  # return an error message if passwords do not match
                 else:
-                    flash("Passwords do not match.")  # return an error message if passwords do not match
+                    flash("Your previous password cannot be reused.")
             else:
                 flash("Invalid token or email address.")
     return render_template('reset_password_helper.html', form=form)
@@ -422,7 +425,7 @@ def reset_password():
                 send_password_reset(email, token)
             except:
                 flash('Error sending reset email. Please try again.')
-                redirect(url_for('reset_password'))
+                return redirect(url_for('reset_password'))
             flash("Please check your email for a password reset link.")
         else:
             flash("Email address not found.")
