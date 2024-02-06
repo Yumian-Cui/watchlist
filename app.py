@@ -227,24 +227,7 @@ def login():
             flash('Invalid username/email or password.')  # If validation fails, display an error message
             
             return redirect(url_for('login'))  # 重定向回登录页面
-            
-            # regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-            # is_email = True if re.fullmatch(regex, identifier) else False
 
-            # if is_email:
-            #     user = User.query.filter_by(email=identifier).first()
-            # else:
-
-
-        # user = User.query.first()
-        # 验证用户名和密码是否一致
-        # if username == user.username and user.validate_password(password):
-        #     login_user(user)  # 登入用户
-        #     flash('Login success.')
-        #     return redirect(url_for('index'))  # 重定向到主页
-
-        # flash('Invalid username or password.')  # 如果验证失败，显示错误消息
-        # return redirect(url_for('login'))  # 重定向回登录页面
 
     return render_template('login.html', form=form)
 
@@ -304,7 +287,7 @@ def confirm_email(token):
         confirm_token.used = True
         db.session.commit()
         # login_user(user)  # log in the user
-        flash('Your email has been confirmed. You can now log in.')
+        flash('Your email has been confirmed. You can now log in or use it for password reset.')
         return redirect(url_for('login'))
     else:
         flash('Invalid or expired confirmation token.')
@@ -419,6 +402,11 @@ def reset_password():
         email = request.form.get('email')
         user = User.query.filter_by(email=email).first()
         if user:
+            if not user.email_confirmed:
+                token = generate_confirmation_token(email, user.id)
+                send_email_confirmation(email, token)
+                flash('Your email is registered but not confirmed. Please confirm it via your inbox now and return to this page to proceed with password reset.')
+                return redirect(url_for('reset_password'))
             token = s.dumps(email, salt='reset-password')
             # ... send `token` to user's email address ...
             try:
@@ -450,7 +438,7 @@ def settings():
             db.session.commit()
             logout_user()
             flash('Your account has been deleted.')
-            # return redirect(url_for('index'))
+            return redirect(url_for('index'))
 
         # A dictionary to store the form fields that can be updated
         updatable_fields = {

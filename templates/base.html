@@ -24,7 +24,7 @@
     <h2>
         <img alt="Avatar" class="avatar" src="{{ url_for('static', filename='images/avatar.png') }}">
         {% if current_user.is_authenticated %}
-            {{ current_user.username }}'s Watchlist
+            {{ current_user.username.capitalize() }}'s Watchlist
         {% else %}
             Unknown's Watchlist
         {% endif %}
