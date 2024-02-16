@@ -25,7 +25,7 @@ class WatchlistTestCase(unittest.TestCase):
         self.context.push()
         db.create_all() # 创建数据库和表
         # 创建测试数据，一个用户，一个电影条目
-        user = User(name='Test', username='test')
+        user = User(name='Test', username='test', email='test@example.com')
         user.set_password('123')
         db.session.add(user) # commit user first, otherwise id would be None if not committing it to db first
         db.session.commit()
@@ -41,7 +41,7 @@ class WatchlistTestCase(unittest.TestCase):
 
 
     def tearDown(self):
-        db.session.close()
+        # db.session.close()
         db.session.remove() # 清除数据库会话
         db.drop_all() # 删除数据库表
         self.context.pop()
@@ -61,14 +61,6 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertIn('Page Not Found - 404', data)
         self.assertIn('Go Back', data)
         self.assertEqual(response.status_code, 404)  # 判断响应状态码
-
-    # 测试主页, not logged in
-    def test_index_page(self):
-        response = self.client.get('/')
-        data = response.get_data(as_text=True)
-        self.assertIn('Unknown\'s Watchlist', data)
-        self.assertIn('Hello! Please log in to access your watchlist.', data)
-        self.assertEqual(response.status_code, 200)
 
     # 辅助方法，用于登入用户
     def login(self):
@@ -144,6 +136,7 @@ class WatchlistTestCase(unittest.TestCase):
             year='2019'
         ), follow_redirects=True)
         data = response.get_data(as_text=True)
+        self.assertIn('This field is required.', data)
         self.assertNotIn('Item updated.', data)
         # self.assertIn('Invalid input.', data)
 
@@ -155,7 +148,10 @@ class WatchlistTestCase(unittest.TestCase):
         data = response.get_data(as_text=True)
         # print(form.errors)
         self.assertNotIn('Item updated.', data)
-        # self.assertNotIn('New Movie Edited Again', data) TODO
+        self.assertIn('This field is required.', data)
+        # In tutorial's logic, if title or year is empty, then it will redirect to index page, flashing "Invalid input."
+        # In my case, I used flask_wtf and wtforms to regulate all these, so there won't be redirects
+        # self.assertNotIn('New Movie Edited Again', data) # comment out b/c does not apply
         # self.assertIn('Invalid input.', data)
 
     # 测试删除条目
@@ -167,30 +163,87 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertIn('Item deleted.', data)
         self.assertNotIn('Test Movie Title', data)
 
+    # 测试登录保护
+    def test_login_protect(self):
+        response = self.client.get('/')
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Logout', data)
+        self.assertNotIn('Settings', data)
+        self.assertNotIn('<form method="post">', data)
+        self.assertNotIn('Delete', data)
+        self.assertNotIn('Edit', data)
+        self.assertIn('Unknown\'s Watchlist', data)
+        self.assertIn('Hello! Please log in to access your watchlist.', data)
+        self.assertEqual(response.status_code, 200)
+
+    # 测试登录
+    def test_login(self):
+        # 测试使用用户名登录
+        response = self.client.post('/login', data=dict(
+            identifier='test',
+            password='123', 
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Login success.', data)
+        self.assertIn('Logout', data)
+        self.assertIn('Settings', data)
+        self.assertIn('Delete', data)
+        self.assertIn('Edit', data)
+        self.assertIn('<form method="post">', data)
+
+        # 测试使用邮箱登录 
+        response = self.client.post('/login', data=dict(
+            identifier='test@example.com',
+            password='123', 
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Login success.', data)
+        self.assertIn('Logout', data)
+        self.assertIn('Settings', data)
+        self.assertIn('Delete', data)
+        self.assertIn('Edit', data)
+        self.assertIn('<form method="post">', data)
+
+        # 测试使用错误的密码登录
+        response = self.client.post('/login', data=dict(
+            identifier='test',
+            password='456'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Login success.', data)
+        self.assertIn('Invalid username/email or password.', data)
+
+        # 测试使用错误的用户名登录
+        response = self.client.post('/login', data=dict(
+            identifier='wrong',
+            password='123'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Login success.', data)
+        self.assertIn('User does not exist.', data)
+
+        # 测试使用空用户名登录
+        response = self.client.post('/login', data=dict(
+            identifier='',
+            password='123'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Login success.', data)
+        # self.assertIn('Invalid input.', data)
+
+        # 测试使用空密码登录
+        response = self.client.post('/login', data=dict(
+            identifier='test',
+            password=''
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Login success.', data)
+        # self.assertIn('Invalid input.', data)
+
+
+# If user registered with a wrong email account, how to design the system to better remind them?
+
     
-
-    # def test_index(self):
-    #     # with self.app.test_request_context():
-    #     response = self.client.get(url_for('index'))
-    #     self.assertEqual(response.status_code, 200)
-
-    # def test_login(self):
-    #     # with self.app.test_request_context():
-    #     user = User(username='test', email='test@example.com')
-    #     user.set_password('testpassword')
-    #     db.session.add(user)
-    #     db.session.commit()
-
-    #     # uses the test client to make a POST request to the login route, passing in the username and password as form data
-    #     response = self.client.post(url_for('login'), data=dict(
-    #         identifier='test',
-    #         password='testpassword'
-    #     ), follow_redirects=True)
-
-    #     self.assertEqual(response.status_code, 200)
-    #     self.assertIn(b'Login success.', response.data)
-
-    # Add more tests as needed
 
 if __name__ == '__main__':
     unittest.main()
