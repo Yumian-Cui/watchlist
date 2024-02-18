@@ -461,17 +461,28 @@ def settings():
         updated_fields = []
         for field, info in updatable_fields.items():
             value = request.form.get(field)
-            if value:  # Check if the field value is not empty
-                if len(value) <= info['max_length']:
+            if value and value.strip():  # Check if the field value is not empty or whitespace
+                if len(value) <= info['max_length']: # TODO: this place should use form, otherwise, although browser might have built-in form validation, it is not caught here and might cause field to be updated
                     # Check if the field is unique
-                    if User.query.filter_by(**{field: value}).first() is None:
+                    user_with_same_field = User.query.filter_by(**{field: value}).first()
+                    if user_with_same_field is None or user_with_same_field.id == current_user.id:
+                        old_email = current_user.email
                         setattr(current_user, field, value)
                         updated_fields.append(field)
+                        # Currently, email is wrongly updated without form validation. TODO
                         if field == 'email':
-                            # Generate a confirmation token and send a confirmation email
-                            token = generate_confirmation_token(value, current_user.id)
-                            send_email_confirmation(value, token)
-                            flash('A confirmation email has been sent to your new email address.')
+                            if not current_user.email_confirmed:
+                                # Generate a confirmation token and send a confirmation email
+                                try:
+                                    token = generate_confirmation_token(value, current_user.id)
+                                    send_email_confirmation(value, token)
+                                except Exception as e:
+                                    flash('Failed to send email. Check if you accidentally misspelled it.')
+                                    return redirect(url_for('settings'))
+                                if old_email == current_user.email:
+                                    flash('A confirmation email has been re-sent to your email address.')
+                                else:
+                                    flash('A confirmation email has been sent to your new email address.')
                     else:
                         flash(info['unique_error_message'])
                         return redirect(url_for('settings'))
@@ -479,8 +490,9 @@ def settings():
                     flash(info['error_message'])
                     return redirect(url_for('settings'))
 
-        db.session.commit()
-        flash('Settings updated: ' + ', '.join(updated_fields) + '.')
+        if len(updated_fields) != 0:
+            db.session.commit()
+            flash('Settings updated: ' + ', '.join(updated_fields) + '.')
         # return redirect(url_for('index'))
 
         # current_user 会返回当前登录用户的数据库记录对象

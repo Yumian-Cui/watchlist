@@ -13,6 +13,9 @@
 <form method="post" style="margin-bottom: 20px;">
     Email <input type="email" name="email" autocomplete="off" required value="{{ current_user.email }}">
     <input class="btn" type="submit" name="submit" value="Save">
+    {% if not current_user.email_confirmed %}
+        <p style="color: red;">Email not confirmed. To resend, click save.</p>
+    {% endif %}
 </form>
 <form method="post">
     <p style="font-weight: bold;">Delete your account (irreversible):</p>

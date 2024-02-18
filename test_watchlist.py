@@ -1,5 +1,6 @@
 import unittest
 from flask import url_for
+from flask_login import current_user
 from app import app, db, User, Movie, EmailConfirmationToken  # Import your Flask application and models here
 
 # app_context: application's environment, needed interact with the application setup or configuration, but no request is in progress
@@ -31,6 +32,11 @@ class WatchlistTestCase(unittest.TestCase):
         db.session.commit()
         movie = Movie(title='Test Movie Title', year='2019', user_id=user.id)
         db.session.add(movie)
+        db.session.commit()
+        #创建用户2用于测试duplicate
+        user2 = User(name='Test2', username='test_duplicate', email='test2@example.com')
+        user2.set_password('1234')
+        db.session.add(user2)
         db.session.commit()
         # 使用 add_all() 方法一次添加多个模型类实例，传入列表
         # db.session.add_all([user, movie])
@@ -239,6 +245,82 @@ class WatchlistTestCase(unittest.TestCase):
         data = response.get_data(as_text=True)
         self.assertNotIn('Login success.', data)
         # self.assertIn('Invalid input.', data)
+
+    # 测试登出
+    def test_logout(self):
+        self.login()
+
+        response = self.client.get('/logout', follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Goodbye.', data)
+        self.assertNotIn('Logout', data)
+        self.assertNotIn('Settings', data)
+        self.assertNotIn('Delete', data)
+        self.assertNotIn('Edit', data)
+        self.assertNotIn('<form method="post">', data)
+
+    # 测试设置
+    def test_settings(self):
+        self.login()
+
+        # 测试设置页面
+        response = self.client.get('/settings')
+        data = response.get_data(as_text=True)
+        self.assertIn('Settings', data)
+        self.assertIn('Name', data)
+        self.assertIn('Username', data)
+        self.assertIn('Email', data)
+        self.assertIn('Delete your account (irreversible):', data)
+
+        # Check if the appropriate message is displayed based on email confirmation status
+        if current_user.email_confirmed:
+            self.assertNotIn('Email not confirmed.', data)
+        else:
+            self.assertIn('Email not confirmed.', data)
+
+        # 测试更新Name设置，名称为空
+        response = self.client.post('/settings', data=dict(
+            name='',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Settings updated', data)
+        # self.assertIn('Please fill out this field.', data) #only exist in brower setting
+        
+        # 测试更新Name设置
+        response = self.client.post('/settings', data=dict(
+            name='Grey Li',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Settings updated: name.', data)
+        self.assertIn('Grey Li', data)
+
+        # 测试更新用户名，用户名和旧用户名一样/用户名唯一
+        response = self.client.post('/settings', data=dict(
+            username='test',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Settings updated: username.', data)
+        self.assertIn('test', data)
+
+        # 测试更新用户名，用户名和旧用户名一样/用户名唯一
+        response = self.client.post('/settings', data=dict(
+            username='test_unique',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Settings updated: username.', data)
+        self.assertIn('test_unique', data)
+
+        # 测试更新用户名，用户名不唯一
+        response = self.client.post('/settings', data=dict(
+            username='test_duplicate',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Settings updated: username.', data)
+        self.assertIn('Username already exists.', data)
+        self.assertNotIn('test_duplicate', data)
+
+        # 邮箱就不测试了，test环境比较复杂
+
 
 
 # If user registered with a wrong email account, how to design the system to better remind them?
