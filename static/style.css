@@ -142,3 +142,32 @@ input[name=year] {
     border: 1px solid #ccc;  /* Reduce the border thickness */
     border-radius: 2px;  /* Reduce the border radius */
 }
+
+.my-alert {
+    border: 1px solid #cc0000;
+    background-color: #ffe6e6;
+    padding: 0px 10px 10px 10px; /* top, right, bottom, left */
+    margin-top: 20px;
+    width: 50%; /* Adjust this to change the width of the alert box */
+}
+
+.my-alert-heading {
+    color: #cc0000;
+    font-weight: bold;
+    font-size: 1.2em; /* Adjust this to change the size of the heading */
+}
+
+.my-alert-button {
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.9em; /* Adjust this to change the size of the button text */
+    transition: background-color 0.3s ease; /* Smooth transition */
+}
+
+.my-alert-button:hover {
+    background-color: #990000; /* Darker shade of red */
+}
+

@@ -2,7 +2,42 @@
 
 {% block content %}
 <h3>Settings</h3>
-<form method="post" style="margin-bottom: 20px;">
+{{ render_form(form) }}
+{% if not current_user.email_confirmed %}
+<form method="post">
+    {{ form.csrf_token }}
+    <p style="color: red;">Email not confirmed. You should have received a confirmation link.
+        <input class="btn" type="submit" name="resend_confirmation" value="Resend Email" style="border-radius: 12px; padding: 5px 10px; border: none; background-color: #4CAF50; color: white; font-size: 12px; transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#2E8B57';" onmouseout="this.style.backgroundColor='#4CAF50';">
+    </p>
+</form>
+{% endif %}
+<form method="post">
+    {{ form.csrf_token }}
+    <div class="my-alert">
+        <h4 class="my-alert-heading">Delete your account (irreversible):</h4>
+        <p>Once you delete your account, there is no going back. Please be certain.</p>
+        <hr>
+        <input class="my-alert-button" type="submit" name="confirm_delete" value="Delete Account" onclick="return confirm('Are you sure?')">
+    </div>
+</form>
+{% endblock %}
+
+<!-- <form method="post"> -->
+    <!-- {{ form.csrf_token }}
+    {{ form.name.label }} {{ form.name }}
+    {{ form.username.label }} {{ form.username }}
+    {{ form.email.label }} {{ form.email }}
+    {% if not current_user.email_confirmed %}
+        <form method="post">
+            <p style="color: red;">Email not confirmed. To resend, 
+                <input type="submit" name="resend_confirmation" value="Resend Confirmation Email" style="border-radius: 50%; padding: 10px 20px; border: none; background-color: #4CAF50; color: white;">
+            </p>
+        </form>
+    {% endif %}
+    {{ form.submit() }} -->
+    <!-- <input class="btn" type="submit" name="submit" value="Add"> -->
+<!-- </form> -->
+<!-- <form method="post" style="margin-bottom: 20px;">
     Name <input type="text" name="name" autocomplete="off" required value="{{ current_user.name }}">
     <input class="btn" type="submit" name="submit" value="Save">
 </form>
@@ -16,9 +51,4 @@
     {% if not current_user.email_confirmed %}
         <p style="color: red;">Email not confirmed. To resend, click save.</p>
     {% endif %}
-</form>
-<form method="post">
-    <p style="font-weight: bold;">Delete your account (irreversible):</p>
-    <input class="btn" type="submit" name="confirm_delete" value="Delete Account" onclick="return confirm('Are you sure?')">
-</form>
-{% endblock %}
+</form> -->

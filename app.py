@@ -6,7 +6,7 @@ from flask import url_for
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
 from flask_wtf import FlaskForm
 from wtforms import StringField, IntegerField, SubmitField, DateField, PasswordField
-from wtforms.validators import DataRequired, Length, Email
+from wtforms.validators import DataRequired, Length, Email, ValidationError
 from datetime import datetime
 from wtforms import widgets
 from flask_bootstrap import Bootstrap5
@@ -431,76 +431,66 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    if request.method == 'POST':
-        if 'confirm_delete' in request.form:
-            # User confirmed deletion
-            db.session.delete(current_user)
-            db.session.commit()
-            logout_user()
-            flash('Your account has been deleted.')
-            return redirect(url_for('index'))
+    form = SettingsForm()
+    if 'confirm_delete' in request.form:
+        db.session.delete(current_user)
+        db.session.commit()
+        logout_user()
+        flash('Your account has been deleted.')
+        return redirect(url_for('index'))
+    if 'resend_confirmation' in request.form:
+        try:
+            token = generate_confirmation_token(current_user.email, current_user.id)
+            send_email_confirmation(current_user.email, token)
+            flash('Confirmation has been re-sent. Please check your inbox.')
+        except Exception as e:
+            flash('Failed to send email. Please try again later or contact support.')
+        return redirect(url_for('settings'))        
 
-        # A dictionary to store the form fields that can be updated
-        updatable_fields = {
-            'name': {
-                'max_length': 20,
-                'error_message': 'Invalid name.'
-            },
-            'username': {
-                'max_length': 20,
-                'error_message': 'Invalid username.',
-                'unique_error_message': 'Username already exists.'
-            },
-            'email': {
-                'max_length': 50,
-                'error_message': 'Invalid email.',
-                'unique_error_message': 'Email already exists.'
-            }
+    if form.validate_on_submit():
+
+        # Map form fields to user attributes
+        field_map = {
+            'name': form.name.data,
+            'username': form.username.data,
+            'email': form.email.data
         }
 
-        updated_fields = []
-        for field, info in updatable_fields.items():
-            value = request.form.get(field)
-            if value and value.strip():  # Check if the field value is not empty or whitespace
-                if len(value) <= info['max_length']: # TODO: this place should use form, otherwise, although browser might have built-in form validation, it is not caught here and might cause field to be updated
-                    # Check if the field is unique
-                    user_with_same_field = User.query.filter_by(**{field: value}).first()
-                    if user_with_same_field is None or user_with_same_field.id == current_user.id:
-                        old_email = current_user.email
-                        setattr(current_user, field, value)
-                        updated_fields.append(field)
-                        # Currently, email is wrongly updated without form validation. TODO
-                        if field == 'email':
-                            if not current_user.email_confirmed:
-                                # Generate a confirmation token and send a confirmation email
-                                try:
-                                    token = generate_confirmation_token(value, current_user.id)
-                                    send_email_confirmation(value, token)
-                                except Exception as e:
-                                    flash('Failed to send email. Check if you accidentally misspelled it.')
-                                    return redirect(url_for('settings'))
-                                if old_email == current_user.email:
-                                    flash('A confirmation email has been re-sent to your email address.')
-                                else:
-                                    flash('A confirmation email has been sent to your new email address.')
-                    else:
-                        flash(info['unique_error_message'])
-                        return redirect(url_for('settings'))
-                else:
-                    flash(info['error_message'])
-                    return redirect(url_for('settings'))
+        changes = []
+        for field, new_value in field_map.items():
+            old_value = getattr(current_user, field)
+            if new_value != old_value:
+                if field == 'email' and not update_email(current_user, new_value):
+                    continue
+                setattr(current_user, field, new_value)
+                changes.append(field)
 
-        if len(updated_fields) != 0:
+        if changes:
             db.session.commit()
-            flash('Settings updated: ' + ', '.join(updated_fields) + '.')
-        # return redirect(url_for('index'))
+            flash('Settings updated: ' + ', '.join(changes) + '.')
+        return redirect(url_for('settings'))
 
-        # current_user 会返回当前登录用户的数据库记录对象
-        # 等同于下面的用法
-        # user = User.query.first()
-        # user.name = name
+    elif request.method == 'GET':
+        form.name.data = current_user.name
+        form.username.data = current_user.username
+        form.email.data = current_user.email
 
-    return render_template('settings.html')
+    return render_template('settings.html', form=form)
+
+
+
+# Assume you're updating your email (!= old email)
+# If success in sending confirmation to the new email address, then return True; if not False.
+def update_email(user, new_email):
+    try:
+        token = generate_confirmation_token(new_email, user.id)
+        send_email_confirmation(new_email, token)
+    except Exception as e:
+        flash('Failed to send confirmation email. Please try again later or contact support team.')
+        return False
+    user.email_confirmed = False #change it to False before user confirms new email
+    flash('A confirmation email has been sent to your new email address. Please confirm it promptly.')
+    return True
 
 
 
@@ -576,6 +566,23 @@ class EmailConfirmationToken(db.Model):
 # def validate_year(form, field):
 #     if field.data > datetime.now().year:
 #         raise ValidationError('Year cannot be after current year.')
+    
+
+class SettingsForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired(), Length(max=20)])
+    username = StringField('Username', validators=[DataRequired(), Length(max=20)])
+    email = StringField('Email', validators=[DataRequired(), Email(), Length(max=50)])
+    submit = SubmitField('Update')
+
+    def validate_username(self, username):
+        user = User.query.filter_by(username=username.data).first()
+        if user and user.id != current_user.id:
+            raise ValidationError('Username already exists.')
+
+    def validate_email(self, email):
+        user = User.query.filter_by(email=email.data).first()
+        if user and user.id != current_user.id:
+            raise ValidationError('Email already exists.')
 
 #Create a new class that inherits from FlaskForm:
 class MovieForm(FlaskForm):
