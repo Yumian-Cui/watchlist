@@ -1,7 +1,7 @@
 import unittest
 from flask import url_for
 from flask_login import current_user
-from app import app, db, User, Movie, EmailConfirmationToken, forge, initdb  # Import your Flask application and models here
+from app import app, db, User, Movie, EmailConfirmationToken, forge, initdb, mail  # Import your Flask application and models here
 
 # app_context: application's environment, needed interact with the application setup or configuration, but no request is in progress
 # test_request_context: 
@@ -198,10 +198,17 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertIn('<form method="post">', data)
 
         # 测试使用邮箱登录 
+        # Confirm the email, NEEDED b/c if not confirmed, it would try to send a confirm email which won't go through
+        user = User.query.filter_by(email='test@example.com').first()
+        user.email_confirmed = True
+        db.session.commit()
+        # with mail.record_messages() as outbox:
         response = self.client.post('/login', data=dict(
             identifier='test@example.com',
             password='123', 
         ), follow_redirects=True)
+        # self.assertEqual(1, len(outbox))
+        # self.assertEqual("Confirm your email", outbox[0].subject)
         data = response.get_data(as_text=True)
         self.assertIn('Login success.', data)
         self.assertIn('Logout', data)
@@ -371,6 +378,8 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertTrue(User.query.first().validate_password('456'))
 
     # 测试注册
+    # def test_registration(self):
+
         
 
 

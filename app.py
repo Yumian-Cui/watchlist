@@ -1,6 +1,6 @@
 import os, sys, click, re
 
-from flask import Flask, render_template, flash, redirect, request
+from flask import Flask, render_template, flash, redirect, request, session
 from markupsafe import escape
 from flask import url_for
 from flask_sqlalchemy import SQLAlchemy  # 导入扩展类
@@ -18,6 +18,7 @@ from flask_login import login_user
 from flask_login import login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
+from datetime import timedelta
 # from flask_security import Security, SQLAlchemyUserDatastore, \
 #     UserMixin, RoleMixin, login_required, utils
 # from wtforms import Field as BaseField
@@ -57,6 +58,7 @@ app = Flask(__name__)
 #配置变量
 app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 app.config['SECRET_KEY'] = 'dev'  # 等同于 app.secret_key = 'dev'
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
@@ -166,6 +168,7 @@ def index():
         db.session.add(movie)  # 添加到数据库会话
         db.session.commit()  # 提交数据库会话
         flash('Item created.')  # 显示成功创建的提示
+        session.modified = True
         return redirect(url_for('index'))
     movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
     # movies = Movie.query.all()
@@ -174,6 +177,9 @@ def index():
 @app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 @login_required
 def edit(movie_id):
+    if 'username' not in session:
+        flash("You were logged out due to inactivity. Please log in again.")
+        return redirect(url_for('index'))
     movie = Movie.query.get_or_404(movie_id)
     form = MovieForm(obj=movie)
     if form.validate_on_submit():
@@ -181,16 +187,21 @@ def edit(movie_id):
         movie.year = form.year.data
         db.session.commit()
         flash('Item updated.')
+        session.modified = True # reset the session timeout eachtime user performs an action
         return redirect(url_for('index'))
     return render_template('edit.html', movie=movie, form=form) # 传入被编辑的电影记录
 
 @app.route('/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
 @login_required  # 登录保护
 def delete(movie_id):
+    if 'username' not in session:
+        flash("You were logged out due to inactivity. Please log in again.")
+        return redirect(url_for('index'))
     movie = Movie.query.get_or_404(movie_id)  # 获取电影记录
     db.session.delete(movie)  # 删除对应的记录
     db.session.commit()  # 提交数据库会话
     flash('Item deleted.')
+    session.modified = True
     return redirect(url_for('index'))  # 重定向回主页
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -206,13 +217,13 @@ def login():
                 return redirect(url_for('login'))
             
             # Check if identifier is a username or an email
-            is_email = User.email == identifier
             user = User.query.filter((User.username == identifier) | (User.email == identifier)).first()
             if user is None:
                 flash('User does not exist.')
                 return redirect(url_for('register'))
             
-            if is_email and not user.email_confirmed:
+            is_email = user.email == identifier # True if the identifier = email of the retrieved user object
+            if is_email and not user.email_confirmed: 
                 flash('Email registered but not confirmed. A new confirmation has been sent. Please confirm it via your inbox first.')
                 token = generate_confirmation_token(user.email, user.id)
                 send_email_confirmation(user.email, token)
@@ -222,6 +233,7 @@ def login():
             if user.validate_password(password):
                 login_user(user)  # Log in the user
                 flash('Login success.')
+                session['username'] = user.username # store data in session after user logs in
                 return redirect(url_for('index'))  # Redirect to the home page
             
             flash('Invalid username/email or password.')  # If validation fails, display an error message
@@ -424,6 +436,7 @@ def reset_password():
 def logout():
     logout_user()  # 登出用户
     flash('Goodbye.')
+    session.pop('username', None) # remove username from session if it's there
     return redirect(url_for('index'))  # 重定向回首页
 
 #设置页面，支持修改用户的名字
@@ -431,6 +444,10 @@ def logout():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
+    if 'username' not in session:
+        flash("You were logged out due to inactivity. Please log in again.")
+        return redirect(url_for('index'))
+    
     form = SettingsForm()
     if 'confirm_delete' in request.form:
         db.session.delete(current_user)
@@ -445,6 +462,7 @@ def settings():
             flash('Confirmation has been re-sent. Please check your inbox.')
         except Exception as e:
             flash('Failed to send email. Please try again later or contact support.')
+        session.modified = True
         return redirect(url_for('settings'))        
 
     if form.validate_on_submit():
@@ -468,6 +486,7 @@ def settings():
         if changes:
             db.session.commit()
             flash('Settings updated: ' + ', '.join(changes) + '.')
+            session.modified = True
         return redirect(url_for('settings'))
 
     elif request.method == 'GET':
@@ -492,7 +511,10 @@ def update_email(user, new_email):
     flash('A confirmation email has been sent to your new email address. Please confirm it promptly.')
     return True
 
-
+@app.route('/reset-session', methods=['POST'])
+def reset_session():
+    session.permanent = True
+    return {'status': 'session reset'}
 
 @app.route('/user/<name>')
 def user_page(name):
