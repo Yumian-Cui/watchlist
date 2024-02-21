@@ -1,7 +1,7 @@
 import unittest
 from flask import url_for
 from flask_login import current_user
-from app import app, db, User, Movie, EmailConfirmationToken, forge, initdb, mail  # Import your Flask application and models here
+from app import app, db, User, Movie, EmailConfirmationToken, forge, initdb, mail,s  # Import your Flask application and models here
 
 # app_context: application's environment, needed interact with the application setup or configuration, but no request is in progress
 # test_request_context: 
@@ -234,6 +234,7 @@ class WatchlistTestCase(unittest.TestCase):
         data = response.get_data(as_text=True)
         self.assertNotIn('Login success.', data)
         self.assertIn('User does not exist.', data)
+        self.assertIn('Create account', data)
 
         # 测试使用空用户名登录
         response = self.client.post('/login', data=dict(
@@ -252,6 +253,7 @@ class WatchlistTestCase(unittest.TestCase):
         data = response.get_data(as_text=True)
         self.assertNotIn('Login success.', data)
         # self.assertIn('Invalid input.', data)
+
 
     # 测试登出
     def test_logout(self):
@@ -378,7 +380,174 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertTrue(User.query.first().validate_password('456'))
 
     # 测试注册
-    # def test_registration(self):
+    def test_registration(self):
+
+        # 测试注册页面
+        response = self.client.get('/register')
+        data = response.get_data(as_text=True)
+        self.assertIn('Create account', data)
+        self.assertIn('Username', data)
+        self.assertIn('Email', data)
+        self.assertIn('Password', data)
+
+        # 测试用空用户名注册
+        response = self.client.post('/register', data=dict(
+            username='',
+            email='test@example.com',
+            password='123'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Registration successful.', data)
+        self.assertNotIn('Error sending confirmation email.', data)
+
+        # 测试用空邮箱注册
+        response = self.client.post('/register', data=dict(
+            username='dfdsf',
+            email='',
+            password='123'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Registration successful.', data)
+        self.assertNotIn('Error sending confirmation email.', data)
+
+        # 测试用空密码注册
+        response = self.client.post('/register', data=dict(
+            username='dfdsf',
+            email='test@example.com',
+            password=''
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertNotIn('Registration successful.', data)
+        self.assertNotIn('Error sending confirmation email.', data)
+
+        # 测试用已占用的用户名注册
+        response = self.client.post('/register', data=dict(
+            username='test',
+            email='test@example.com',
+            password='1234'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Username already exists', data)
+        self.assertIn('Create account', data)
+        self.assertNotIn('Registration successful.', data)
+        self.assertNotIn('Error sending confirmation email.', data)
+
+        # 测试用已占用的邮箱注册
+        response = self.client.post('/register', data=dict(
+            username='test567',
+            email='test@example.com',
+            password='1234'
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Email already exists', data)
+        self.assertIn('Create account', data)
+        self.assertNotIn('Registration successful.', data)
+        self.assertNotIn('Error sending confirmation email.', data)
+
+    # 测试忘记用户名
+    def test_forget_username(self):
+
+        #测试find username页面
+        response = self.client.get('/find_username')
+        data = response.get_data(as_text=True)
+        self.assertIn('Forget your username?', data)
+        self.assertIn('Email', data)
+
+        #测试找回用户名，当邮箱已认证
+        #模拟邮箱认证
+        user = User.query.filter_by(email='test@example.com').first()
+        user.email_confirmed = True
+        db.session.commit()
+        response = self.client.post('/find_username', data=dict(
+            email='test@example.com',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Email confirmed already', data)
+        self.assertNotIn('Your email is registered but not confirmed', data)
+
+        #测试邮箱不存在
+        response = self.client.post('/find_username', data=dict(
+            email='test_none@example.com',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('No account found with that email', data)
+
+        #掠过涉及发送邮件部分
+
+    #测试密码重置
+    def test_reset_password(self):
+
+        #测试密码重置页面
+        response = self.client.get('/reset_password')
+        data = response.get_data(as_text=True)
+        self.assertIn('Forget your password?', data)
+        self.assertIn('Email', data)
+
+        #测试邮箱不存在
+        response = self.client.post('/reset_password', data=dict(
+            email='test_none@example.com',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('No account found with that email', data)
+
+        #掠过涉及发送邮件部分
+
+    def test_reset_password_helper(self):
+
+        user = User.query.filter_by(email='test@example.com').first()
+        
+         # Generate a valid token for the user
+        token = s.dumps(user.email, salt='reset-password')
+
+        # Test reset password helper page
+        response = self.client.get(f'/reset_password/{token}')
+        data = response.get_data(as_text=True)
+        self.assertIn('Enter your new password below', data)
+
+        # Test reusing old password
+        response = self.client.post(f'/reset_password/{token}', data=dict(
+            new_password='123',
+            confirm_password='123',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Your previous password cannot be reused.', data)
+
+        # Test mismatched passwords
+        response = self.client.post(f'/reset_password/{token}', data=dict(
+            new_password='new_password',
+            confirm_password='different_password',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Passwords do not match.', data)
+        self.assertNotIn('Your password has been reset.', data)
+        self.assertIn('Enter your new password below', data)
+
+        # Test invalid token and password reset
+        invalid_token = 'invalid_token'
+        response = self.client.post(f'/reset_password/{invalid_token}', data=dict(
+            new_password='new_password',
+            confirm_password='new_password',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('The password reset link is invalid or has expired.', data)
+        self.assertIn('Enter your email address below. If you have an account, we will send you an reset password link.', data)
+
+        # Test valid token and password reset
+        response = self.client.post(f'/reset_password/{token}', data=dict(
+            new_password='new_password',
+            confirm_password='new_password',
+        ), follow_redirects=True)
+        data = response.get_data(as_text=True)
+        self.assertIn('Your password has been reset.', data)
+        self.assertIn('Login', data)
+    
+
+
+
+
+
+
+
 
         
 

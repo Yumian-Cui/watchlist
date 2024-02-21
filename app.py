@@ -19,6 +19,7 @@ from flask_login import login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Mail, Message
 from datetime import timedelta
+from flask_wtf.csrf import CSRFProtect, CSRFError
 # from flask_security import Security, SQLAlchemyUserDatastore, \
 #     UserMixin, RoleMixin, login_required, utils
 # from wtforms import Field as BaseField
@@ -82,6 +83,13 @@ db = SQLAlchemy(app)  # 初始化扩展，传入程序实例 app
 migrate = Migrate(app, db) # https://github.com/miguelgrinberg/Flask-Migrate
 
 app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = ('username','email')
+
+csrf = CSRFProtect(app)
+
+#Refresh the page when The CSRF token has expired
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return redirect(request.url)
 
 
 @app.context_processor
@@ -204,6 +212,7 @@ def delete(movie_id):
     session.modified = True
     return redirect(url_for('index'))  # 重定向回主页
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
@@ -254,8 +263,8 @@ def register():
 
             user = User.query.filter_by(username=username).first()
             if user is not None:
-                flash('Username already exists. Please log in.')
-                return redirect(url_for('login'))
+                flash('Username already exists. Please use another one.')
+                return redirect(url_for('register'))
             
             # Check if the email already exists
             user = User.query.filter_by(email=email).first()
@@ -428,7 +437,7 @@ def reset_password():
                 return redirect(url_for('reset_password'))
             flash("Please check your email for a password reset link.")
         else:
-            flash("Email address not found.")
+            flash("No account found with that email.")
     return render_template('reset_password.html')
 
 @app.route('/logout')
