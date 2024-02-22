@@ -1,7 +1,10 @@
 import unittest
 from flask import url_for
 from flask_login import current_user
-from app import app, db, User, Movie, EmailConfirmationToken, forge, initdb, mail,s  # Import your Flask application and models here
+
+from app import app, db,mail,s
+from app.models import Movie, User, EmailConfirmationToken
+from app.commands import forge, initdb
 
 # app_context: application's environment, needed interact with the application setup or configuration, but no request is in progress
 # test_request_context: 
