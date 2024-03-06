@@ -9,6 +9,8 @@ from app import app, db, s, mail
 from app.models import User, Movie, EmailConfirmationToken
 from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm
 
+
+# Routes related to movie dashboard
 @app.route('/', methods=['GET', 'POST'])
 # 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
 def index():
@@ -28,7 +30,7 @@ def index():
         return redirect(url_for('index'))
     movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
     # movies = Movie.query.all()
-    return render_template('index.html', movies=movies, form=form)
+    return render_template('watchlist/index.html', movies=movies, form=form)
 
 @app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 @login_required
@@ -45,7 +47,7 @@ def edit(movie_id):
         flash('Item updated.')
         session.modified = True # reset the session timeout eachtime user performs an action
         return redirect(url_for('index'))
-    return render_template('edit.html', movie=movie, form=form) # 传入被编辑的电影记录
+    return render_template('watchlist/edit.html', movie=movie, form=form) # 传入被编辑的电影记录
 
 @app.route('/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
 @login_required  # 登录保护
@@ -60,7 +62,7 @@ def delete(movie_id):
     session.modified = True
     return redirect(url_for('index'))  # 重定向回主页
 
-
+# Routes related to authentication
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
@@ -97,8 +99,7 @@ def login():
             
             return redirect(url_for('login'))  # 重定向回登录页面
 
-
-    return render_template('login.html', form=form)
+    return render_template('auth/login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -144,7 +145,7 @@ def register():
             # login_user(user)  # log in the user
             return redirect(url_for('login'))  # redirect to the main page
 
-    return render_template('register.html', form=form)
+    return render_template('auth/register.html', form=form)
 
 @app.route('/confirm-email/<token>')
 def confirm_email(token):
@@ -241,7 +242,7 @@ def reset_password_helper(token):
                     flash("Your previous password cannot be reused.")
             else:
                 flash("Invalid token or email address.")
-    return render_template('reset_password_helper.html', form=form)
+    return render_template('auth/reset_password_helper.html', form=form)
 
 
 # One shouldn't need to request their username: they need to retrieve username based on email; if they remember email then they
@@ -263,7 +264,7 @@ def find_username():
         else:
             flash('No account found with that email.')
         return redirect(url_for('find_username'))
-    return render_template('find_username.html')
+    return render_template('auth/find_username.html')
 
 @app.route('/reset_password', methods=["GET", "POST"])
 def reset_password():
@@ -286,7 +287,7 @@ def reset_password():
             flash("Please check your email for a password reset link.")
         else:
             flash("No account found with that email.")
-    return render_template('reset_password.html')
+    return render_template('auth/reset_password.html')
 
 @app.route('/logout')
 @login_required  # 用于视图保护，后面会详细介绍
@@ -296,6 +297,7 @@ def logout():
     session.pop('username', None) # remove username from session if it's there
     return redirect(url_for('index'))  # 重定向回首页
 
+# Routes related to user profile page
 #设置页面，支持修改用户的名字
 #支持用户删除账户
 @app.route('/settings', methods=['GET', 'POST'])
@@ -351,7 +353,7 @@ def settings():
         form.username.data = current_user.username
         form.email.data = current_user.email
 
-    return render_template('settings.html', form=form)
+    return render_template('profile/settings.html', form=form)
 
 
 
