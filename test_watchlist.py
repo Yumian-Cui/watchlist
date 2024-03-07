@@ -181,7 +181,7 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertNotIn('<form method="post">', data)
         self.assertNotIn('Delete', data)
         self.assertNotIn('Edit', data)
-        self.assertIn('Unknown\'s Watchlist', data)
+        self.assertNotIn('Logged in as', data)
         self.assertIn('Hello! Please log in to access your watchlist.', data)
         self.assertEqual(response.status_code, 200)
 
@@ -198,6 +198,7 @@ class WatchlistTestCase(unittest.TestCase):
         self.assertIn('Settings', data)
         self.assertIn('Delete', data)
         self.assertIn('Edit', data)
+        self.assertIn('Logged in as test', data)
         self.assertIn('<form method="post">', data)
 
         # 测试使用邮箱登录 

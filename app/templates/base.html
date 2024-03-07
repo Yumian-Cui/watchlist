@@ -9,7 +9,7 @@
         {% if current_user.is_authenticated %}
             {{ current_user.username.capitalize() }}'s Watchlist
         {% else %}
-            Unknown's Watchlist
+            FriendFlix: Share the Watchlist
         {% endif %}
     </title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
@@ -24,11 +24,7 @@
     {% endfor %}
     <h2>
         <img alt="Avatar" class="avatar" src="{{ url_for('static', filename='images/avatar.png') }}">
-        {% if current_user.is_authenticated %}
-            {{ current_user.username.capitalize() }}'s Watchlist
-        {% else %}
-            Unknown's Watchlist
-        {% endif %}
+        FriendFlix: Share the Watchlist
     </h2>
     <nav>
         <ul>
@@ -36,6 +32,7 @@
             {% if current_user.is_authenticated %}
                 <li><a href="{{ url_for('settings') }}">Settings</a></li>
                 <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                <li style="float: right; font-size: 0.8em;"><a>Logged in as {{ current_user.username }}</a></li>
             {% else %}
                 <li><a href="{{ url_for('login') }}">Login</a></li>
             {% endif %}
