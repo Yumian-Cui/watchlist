@@ -1,8 +1,9 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SubmitField, DateField, PasswordField
+from wtforms import StringField, IntegerField, SubmitField, DateField, PasswordField, TextAreaField
 from wtforms.validators import DataRequired, Length, Email, ValidationError
 from flask_login import current_user
 from wtforms import StringField as BaseStringField, PasswordField as BasePasswordField, Field as BaseField
+import datetime
 
 from app.models import User
 
@@ -36,10 +37,23 @@ class SettingsForm(FlaskForm):
 
 #Create a new class that inherits from FlaskForm:
 class MovieForm(FlaskForm):
+    def validate_year(form, field):
+        try:
+            year = int(field.data)
+            current_year = datetime.datetime.now().year
+            if year < 1900 or year > current_year:
+                raise ValidationError('Year must be between 1900 and the current year.')
+        except ValueError:
+            raise ValidationError('Invalid year. Please enter a valid year.')
+        
     title = StringField('Title', validators=[DataRequired(), Length(max=60)]) #first argument is the label of the field, which is used to generate the label tag in the HTML form
-    year = StringField('Year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.')]) #length must be 4
+    year = StringField('Year', validators=[DataRequired(), Length(min=4, max=4, message='Invalid year.'), validate_year])
     # year = DateField('year', validators=[DataRequired()], format='%Y')
     submit = SubmitField()
+
+class ReviewForm(FlaskForm):
+    content = TextAreaField('Review', validators=[DataRequired()])
+    submit = SubmitField('Add Review')
 
 
 # Authentification form fields follow a different styling than MovieForm

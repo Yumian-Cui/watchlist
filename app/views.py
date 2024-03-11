@@ -6,8 +6,8 @@ from flask_mail import Message
 
 
 from app import app, db, s, mail
-from app.models import User, Movie, EmailConfirmationToken
-from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm
+from app.models import User, Movie, EmailConfirmationToken, Review
+from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm, ReviewForm
 
 
 # Routes related to movie dashboard
@@ -49,7 +49,8 @@ def edit(movie_id):
         return redirect(url_for('index'))
     return render_template('watchlist/edit.html', movie=movie, form=form) # 传入被编辑的电影记录
 
-@app.route('/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
+@app.route('/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求, 3/11 Weird 405 error
+# https://stackoverflow.com/questions/20689195/flask-error-method-not-allowed-the-method-is-not-allowed-for-the-requested-url
 @login_required  # 登录保护
 def delete(movie_id):
     if 'username' not in session:
@@ -61,6 +62,19 @@ def delete(movie_id):
     flash('Item deleted.')
     session.modified = True
     return redirect(url_for('index'))  # 重定向回主页
+
+@app.route('/add_review/<int:movie_id>', methods=['GET', 'POST'])
+@login_required  # 登录保护
+def add_review(movie_id):
+    form = ReviewForm()
+    movie = Movie.query.get_or_404(movie_id)
+    if form.validate_on_submit():
+        review = Review(content=form.content.data, movie=movie)
+        db.session.add(review)
+        db.session.commit()
+        flash('Your review has been added.', 'success')
+        # return redirect(url_for('index'))  # or wherever you want to redirect
+    return render_template('watchlist/add_review.html', title='Add Review', form=form, movie=movie)
 
 # Routes related to authentication
 @app.route('/login', methods=['GET', 'POST'])
