@@ -7,4 +7,5 @@ __pycache__
 *.txt
 htmlcov/
 .coverage
-/env/
+env/
+migrations/
