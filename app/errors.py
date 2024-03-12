@@ -23,3 +23,7 @@ def bad_request(e):  # 接受异常对象作为参数
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('errors/500.html'), 500
+
+@app.errorhandler(405)
+def internal_server_error(e):
+    return render_template('errors/405.html'), 405
