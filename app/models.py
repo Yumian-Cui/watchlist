@@ -32,15 +32,16 @@ class Movie(db.Model):  # 模型类是Movie, 表名将会是 movie
     title = db.Column(db.String(60))  # 电影标题
     year = db.Column(db.String(4))  # 电影年份
     user_id = db.Column(db.Integer, db.ForeignKey('user.id')) #将 User 表和 Movie 表建立关联 added a user_id column to the Movie table, which is a foreign key that references the id column in the User table
-    reviews = db.relationship('Review', back_populates='movie', lazy='dynamic', cascade='all, delete-orphan')
+    review = db.Column(db.Text, nullable=True)  # Add this line
+    # reviews = db.relationship('Review', back_populates='movie', lazy='dynamic', cascade='all, delete-orphan')
 
-class Review(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id'))
+# class Review(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     content = db.Column(db.Text, nullable=False)
+#     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+#     movie_id = db.Column(db.Integer, db.ForeignKey('movie.id'))
 
-    movie = db.relationship('Movie', back_populates='reviews')    
+#     movie = db.relationship('Movie', back_populates='reviews')    
 
 
 

@@ -6,7 +6,7 @@ from flask_mail import Message
 
 
 from app import app, db, s, mail
-from app.models import User, Movie, EmailConfirmationToken, Review
+from app.models import User, Movie, EmailConfirmationToken
 from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm, ReviewForm
 
 
@@ -68,12 +68,19 @@ def delete(movie_id):
 def add_review(movie_id):
     form = ReviewForm()
     movie = Movie.query.get_or_404(movie_id)
+    # reviews = movie.reviews.all()  # Fetch all reviews for the movie
+
     if form.validate_on_submit():
-        review = Review(content=form.content.data, movie=movie)
-        db.session.add(review)
+        movie.review = form.content.data  # Update the review content
+        # review = Review(content=form.content.data, movie=movie)
+        # db.session.add(review)
         db.session.commit()
+        # print(f"Review added: {review.content}") # Add this line to check if the review is being saved
         flash('Your review has been added.', 'success')
         # return redirect(url_for('index'))  # or wherever you want to redirect
+    
+    form.content.data = movie.review or ''  # Populate the form with the existing review
+
     return render_template('watchlist/add_review.html', title='Add Review', form=form, movie=movie)
 
 # Routes related to authentication
