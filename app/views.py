@@ -6,31 +6,88 @@ from flask_mail import Message
 
 
 from app import app, db, s, mail
-from app.models import User, Movie, EmailConfirmationToken
+from app.models import User, Movie, EmailConfirmationToken, Board
 from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm, ReviewForm
 
 
-# Routes related to movie dashboard
 @app.route('/', methods=['GET', 'POST'])
-# 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
 def index():
-    if request.method == 'POST':
-        if not current_user.is_authenticated:  # 如果当前用户未认证
-            return redirect(url_for('index'))  # 重定向到主页
+    if request.method == 'POST' and not current_user.is_authenticated:
+        return redirect(url_for('index'))
+
     form = MovieForm()
-    if form.validate_on_submit():
+
+    if current_user.is_authenticated:
+        # Query all boards at the beginning to ensure "Uncategorized" exists and get the initial list.
+        boards = Board.query.filter_by(user_id=current_user.id).all()
+        uncategorized_board = next((b for b in boards if b.name == 'Uncategorized'), None)
+        if not uncategorized_board:
+            # Create and commit "Uncategorized" board if it doesn't exist.
+            uncategorized_board = Board(name='Uncategorized', user_id=current_user.id)
+            db.session.add(uncategorized_board)
+            db.session.commit()
+            # Ensure the uncategorized board is included in the list.
+            boards.append(uncategorized_board)
+
+    else:
+        boards = []
+
+    if form.validate_on_submit() and current_user.is_authenticated:
+        new_board_name = request.form.get('new_board_name')
+        board_id = request.form.get('board_id')
+        if new_board_name:
+            # Check if the board already exists.
+            board = Board.query.filter_by(user_id=current_user.id, name=new_board_name).first()
+            if not board:
+                # If it doesn't exist, create a new board.
+                board = Board(name=new_board_name, user_id=current_user.id)
+                db.session.add(board)
+                db.session.commit()
+                # Add the new board to the boards list to make it available in the template immediately.
+                boards.append(board)
+        else:
+            # board_id = request.form.get('board_id')
+            board = Board.query.get(board_id) if board_id else uncategorized_board
+        
         title = form.title.data
         year = form.year.data
-        # Add movie to database here...
-        movie = Movie(title=title, year=year, user_id=current_user.id)  # 创建记录
-        db.session.add(movie)  # 添加到数据库会话
-        db.session.commit()  # 提交数据库会话
-        flash('Item created.')  # 显示成功创建的提示
+        movie = Movie(title=title, year=year, user_id=current_user.id, board=board)
+        db.session.add(movie)
+        db.session.commit()
+        flash('Item created.', 'success')
         session.modified = True
         return redirect(url_for('index'))
-    movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
-    # movies = Movie.query.all()
-    return render_template('watchlist/index.html', movies=movies, form=form)
+
+    movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else []
+    # Re-query boards to ensure the list is up-to-date after any adds in this request.
+    boards = Board.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else []
+    return render_template('watchlist/index.html', movies=movies, form=form, boards=boards)
+
+
+
+
+# Routes related to movie dashboard
+# @app.route('/', methods=['GET', 'POST'])
+# # 当用户在浏览器访问这个 URL 的时候，就会触发这个视图函数（view funciton）这里的 /指的是根地址
+# def index():
+#     if request.method == 'POST':
+#         if not current_user.is_authenticated:  # 如果当前用户未认证
+#             return redirect(url_for('index'))  # 重定向到主页
+#     form = MovieForm()
+#     boards = Board.query.filter_by(user_id=current_user.id).all()
+#     if form.validate_on_submit():
+#         title = form.title.data
+#         year = form.year.data
+#         # Add movie to database here...
+#         movie = Movie(title=title, year=year, user_id=current_user.id)  # 创建记录
+#         db.session.add(movie)  # 添加到数据库会话
+#         db.session.commit()  # 提交数据库会话
+#         flash('Item created.')  # 显示成功创建的提示
+#         session.modified = True
+#         return redirect(url_for('index'))
+#     movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
+#     # movies = Movie.query.all()
+#     return render_template('watchlist/index.html', movies=movies, form=form)
 
 @app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 @login_required

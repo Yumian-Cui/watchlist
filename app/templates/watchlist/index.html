@@ -4,7 +4,32 @@
 <p>{{ movies|length }} Titles</p>
 <!-- 在模板中可以直接使用 current_user 变量 -->
 {% if current_user.is_authenticated %}
-{{ render_form(form) }}
+<form id="movieForm" method="post">
+    {{ form.csrf_token }}
+    {{ form.title.label }} {{ form.title }}
+    {{ form.year.label }} {{ form.year }}
+    <input class="btn" type="submit" value="Add">
+</form>
+<!-- {{ render_form(form) }} -->
+<!-- Modal HTML -->
+<div id="boardModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Select Board</h3>
+        {% for board in boards %}
+        <div>
+            <input type="radio" id="board_{{ board.id }}" name="board_id" value="{{ board.id }}">
+            <label for="board_{{ board.id }}">{{ board.name }}</label>
+        </div>
+        {% endfor %}
+        <div>
+            <input type="radio" id="new_board" name="board_id" value="">
+            <label for="new_board">Create New Board</label>
+            <input type="text" id="new_board_name" name="new_board_name" placeholder="New Board Name">
+        </div>
+        <button id="selectBoard">Select</button>
+    </div>
+</div>
 <!-- <form method="post">
     {{ form.csrf_token }}
     {{ form.title.label }} {{ form.title }}
@@ -15,7 +40,7 @@
 </form> -->
 <ul class="movie-list">
     {% for movie in movies %}
-    <li>{{ movie.title }} - {{ movie.year }}
+    <li>{{ movie.title }} - {{ movie.year }} - {{ movie.board.name }}
         <span class="float-right">
             {% if current_user.is_authenticated %}
                 <a class="btn" href="{{ url_for('edit', movie_id=movie.id) }}">Edit</a>

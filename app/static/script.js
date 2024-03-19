@@ -12,6 +12,66 @@ document.onmousemove = function(){
   }, 600000*3); // 30 minutes
 }
 
+// Get the modal and its elements
+var modal = document.getElementById("boardModal");
+var closeBtn = document.getElementsByClassName("close")[0];
+var selectBtn = document.getElementById("selectBoard");
+
+// When the user clicks the "Add" button, open the modal
+document.forms['movieForm'].addEventListener('submit', function(event) {
+    event.preventDefault(); // Prevent form submission
+    modal.style.display = "block"; // Show the modal
+});
+
+// When the user clicks on the close button, close the modal
+closeBtn.onclick = function() {
+    modal.style.display = "none";
+}
+
+// When the user clicks outside the modal, close it
+window.onclick = function(event) {
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+
+// Handle board selection
+selectBtn.onclick = function() {
+    // Get the selected board or new board name
+    var boardId = document.querySelector('input[name="board_id"]:checked').value;
+    var newBoardName = document.getElementById("new_board_name").value;
+
+    // Check if creating a new board or using an existing one, and set appropriate form data
+    var form = document.forms['movieForm'];
+    if (newBoardName) {
+      var newBoardInput = document.createElement('input');
+      newBoardInput.type = 'hidden';
+      newBoardInput.name = 'new_board_name';
+      newBoardInput.value = newBoardName;
+      form.appendChild(newBoardInput);
+    } else if (boardId) {
+      var boardIdInput = document.createElement('input');
+      boardIdInput.type = 'hidden';
+      boardIdInput.name = 'board_id';
+      boardIdInput.value = boardId;
+      form.appendChild(boardIdInput);
+    }
+
+    // // Add the selected board to the form data
+    // var form = document.forms['movieForm'];
+    // var boardInput = document.createElement('input');
+    // boardInput.type = 'hidden';
+    // boardInput.name = 'board_id';
+    // boardInput.value = boardId || newBoardName;
+    // form.appendChild(boardInput);
+
+    // Submit the form
+    form.submit();
+
+    // Close the modal after successful submission
+    modal.style.display = "none";
+}
+
 // document.addEventListener('DOMContentLoaded', function() {
 //   // Find all delete buttons in the document
 //   document.querySelectorAll('.delete-btn').forEach(function(deleteBtn) {
