@@ -16,6 +16,10 @@
     <div class="modal-content">
         <span class="close">&times;</span>
         <h3>Select Board</h3>
+        <!-- Hidden input to store movie ID -->
+        <input type="hidden" id="movie_id" name="movie_id" value="">
+        <!-- Hidden input to store context (create or switch) -->
+        <input type="hidden" id="modal_context" name="modal_context" value="">
         {% for board in boards %}
         <div>
             <input type="radio" id="board_{{ board.id }}" name="board_id" value="{{ board.id }}">
@@ -30,6 +34,92 @@
         <button id="selectBoard">Select</button>
     </div>
 </div>
+
+<!-- Edit Board Modal HTML -->
+<div id="editBoardModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditBoardModal();">&times;</span>
+        <h3>Edit Board Name</h3>
+        <input type="hidden" id="edit_board_id" name="edit_board_id" value="">
+        <input type="text" id="edit_board_name" name="edit_board_name" placeholder="New Board Name">
+        <button id="saveBoardChanges">Save</button>
+    </div>
+</div>
+
+<script>
+    // Listen for form submission to trigger "create" context
+    document.getElementById('movieForm').addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent form from submitting immediately
+        
+        // Assume form is valid and movie is created
+        const movieId = 'new'; // Set movieId to 'new' for creating a new movie
+        
+        // Set up modal for "create" context
+        openBoardModal(null, 'create', movieId); // Open the modal with 'create' context
+        
+    });
+
+    document.getElementById('selectBoard').addEventListener('click', function(event) {
+        event.preventDefault();
+
+        const context = document.getElementById('modal_context').value; // Get current modal context (create or switch)
+        const movieId = document.getElementById('movie_id').value;
+        const selectedBoard = document.querySelector('input[name="board_id"]:checked');
+        const newBoardName = document.getElementById('new_board_name').value.trim();
+
+        // Ensure only one of the inputs is set
+        const formData = new FormData();
+        formData.append('movie_id', movieId);
+
+        if (selectedBoard && selectedBoard.id !== 'new_board' && !newBoardName) {
+            // Existing board is selected
+            formData.append('board_id', selectedBoard.value);
+        } else if (newBoardName) {
+            // Create new board case
+            formData.append('new_board_name', newBoardName);
+        } else {
+            alert("Please select a board or enter a new board name.");
+            return;
+        }
+
+        if (context === 'switch') {
+            // Handle switching the board case
+            fetch('{{ url_for("switch_board") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': "{{ form.csrf_token._value() }}"  // Ensure CSRF token is sent
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Board switched successfully!");
+                    closeBoardModal();
+                    location.reload(); // Reload page or update UI as needed
+                } else {
+                    alert("Error switching board: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while switching the board.");
+            });
+        }
+    });
+
+    function openBoardModal(element, context) {
+        const movieId = element.getAttribute('data-movie-id'); // Retrieve the movie ID from the data attribute
+        document.getElementById('movie_id').value = movieId;
+        document.getElementById('modal_context').value = context; // Set context ('create' or 'switch')
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    function closeBoardModal() {
+        document.getElementById('boardModal').style.display = 'none';
+    }
+</script>
+
 <!-- <form method="post">
     {{ form.csrf_token }}
     {{ form.title.label }} {{ form.title }}
@@ -38,25 +128,204 @@
     Year <input type="text" name="year" autocomplete="off" required> // should be commented out
     <input class="btn" type="submit" name="submit" value="Add">
 </form> -->
-<ul class="movie-list">
-    {% for movie in movies %}
-    <li>{{ movie.title }} - {{ movie.year }} - {{ movie.board.name }}
-        <span class="float-right">
-            {% if current_user.is_authenticated %}
-                <a class="btn" href="{{ url_for('edit', movie_id=movie.id) }}">Edit</a>
-                <a class="btn" href="{{ url_for('add_review', movie_id=movie.id) }}">Review</a>
-                <!-- <a class="btn delete-btn" href="{{ url_for('delete', movie_id=movie.id) }}">Delete</a> -->
-                <form class="inline-form" method="post" action="{{ url_for('delete', movie_id=movie.id) }}">
-                    {{ form.csrf_token }} <!--MUST ADD THIS, OTHERWISE 405 error -->
-                    <!-- <input class="btn" type="submit" name="delete" value="Delete"> -->
-                    <input class="btn" type="submit" name="delete" value="Delete" onclick="return confirm('Are you sure? Deleting the movie will delete all its reviews as well.')">
-                </form>
-            {% endif %}
-            <a class="imdb" href="https://www.imdb.com/find?q={{ movie.title }}" target="_blank" title="Find this movie on IMDb">IMDb</a>
-        </span>
-    </li>
+<!-- Collapsible Board Sections -->
+<div class="boards-container">
+    {% for board in boards %}
+    <div class="board-section">
+        <div class="collapsible-header">
+            <span class="arrow">&#9654;</span> <!-- Right-pointing arrow -->
+            <span class="board-name">{{ board.name }}</span>
+            <!-- Delete Icon (Right-Aligned) -->
+            <span class="float-right">
+                <a href="#" class="edit-board" data-board-id="{{ board.id }}" onclick="openEditBoardModal('{{ board.id }}'); return false;" title="Edit Board">
+                    ✏️ <!-- Pencil Icon -->
+                </a>
+                <a href="#" class="delete-board" data-board-id="{{ board.id }}" onclick="confirmDeleteBoard('{{ board.id }}'); return false;" title="Delete Board">
+                    🗑️ <!-- Trash Bin Icon -->
+                </a>                
+            </span>
+        </div>
+        <div class="content" style="display: none;">
+            <ul class="movie-list">
+                {% for movie in board.movies %}
+                <li>{{ movie.title }} - {{ movie.year }}
+                    <span class="float-right">
+                        {% if current_user.is_authenticated %}
+                            <a class="btn" href="{{ url_for('edit', movie_id=movie.id) }}">Edit</a>
+                            <a class="btn" href="{{ url_for('add_review', movie_id=movie.id) }}">Review</a>
+                            <form class="inline-form" method="post" action="{{ url_for('delete', movie_id=movie.id) }}">
+                                {{ form.csrf_token }}
+                                <input class="btn" type="submit" name="delete" value="Delete" onclick="return confirm('Are you sure? Deleting the movie will delete all its reviews as well.')">
+                            </form>
+                            <!-- Switch Board button with data attribute for movie ID -->
+                            <!-- Switch Board button should call openBoardModal with context 'switch' -->
+                            <a class="btn switch-board-btn" href="#" data-movie-id="{{ movie.id }}" onclick="openBoardModal(this, 'switch'); return false;">Switch Board</a>
+                        {% endif %}
+                        <a class="imdb" href="https://www.imdb.com/find?q={{ movie.title }}" target="_blank" title="Find this movie on IMDb">IMDb</a>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
     {% endfor %}
-</ul>
+</div>
+
+<style>
+    .boards-container {
+        margin-top: 20px;
+    }
+
+    .board-section {
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .collapsible-header {
+        padding: 10px 15px;
+        background-color: #f8f8f8;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+        border-bottom: 1px solid #ddd;
+        position: relative; /* Add position relative for the trash bin positioning */
+    }
+
+    .board-name {
+        flex-grow: 1; /* Makes the board name take up remaining space */
+    }
+
+    .delete-container {
+        margin-left: auto; /* Push delete icon to the far right */
+    }
+
+    .collapsible-header:hover {
+        background-color: #e0e0e0;
+    }
+
+    .edit-board,
+    .delete-board {
+        position: relative;
+        right: 15px; /* Adjust the spacing from the right as needed */
+        cursor: pointer;
+        /* color: #e74c3c; Example color for the trash bin */
+        font-size: 16px;
+        text-decoration: none; /* Removes underline */
+    }
+
+    .arrow {
+        margin-right: 10px;
+        transition: transform 0.2s;
+    }
+
+    .arrow.active {
+        transform: rotate(90deg); /* Rotate arrow when active */
+    }
+
+    .content {
+        padding: 10px 15px;
+        background-color: #fff;
+    }
+</style>
+
+<script>
+
+    document.getElementById('saveBoardChanges').addEventListener('click', function(event) {
+        event.preventDefault();
+
+        const boardId = document.getElementById('edit_board_id').value;
+        const newBoardName = document.getElementById('edit_board_name').value.trim();
+
+        if (!newBoardName) {
+            alert("Board name cannot be empty.");
+            return;
+        }
+
+        fetch('{{ url_for("edit_board") }}', {
+            method: 'POST',
+            body: JSON.stringify({ edit_board_id: boardId, edit_board_name: newBoardName }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': "{{ form.csrf_token._value() }}"  // Ensure CSRF token is sent
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("Board name updated successfully!");
+                closeEditBoardModal();
+                location.reload(); // Reload page or update UI as needed
+            } else {
+                alert("Error updating board name: " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("An error occurred while updating the board name.");
+        });
+    });
+
+
+    function openEditBoardModal(boardId) {
+        // Open modal and populate it with the current board name
+        const modal = document.getElementById('editBoardModal');
+        const boardNameInput = document.getElementById('edit_board_name');
+        const boardIdInput = document.getElementById('edit_board_id');
+        
+        boardIdInput.value = boardId;
+        // Fetch the current board name and set it to the input (you'll need to do this via AJAX or some other method)
+        
+        modal.style.display = 'block';
+    }
+
+    function closeEditBoardModal() {
+        document.getElementById('editBoardModal').style.display = 'none';
+    }
+
+    function confirmDeleteBoard(boardId) {
+        if (confirm("Are you sure you want to delete this board and all its associated movies?")) {
+            // Send DELETE request to Flask route
+            fetch(`/delete_board/${boardId}`, {
+                method: 'POST', // Using POST for CSRF token protection
+                headers: {
+                    'X-CSRFToken': "{{ form.csrf_token._value() }}"  // Ensure CSRF token is sent
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Board deleted successfully!");
+                    location.reload(); // Reload page or update UI as needed
+                } else {
+                    alert("Error deleting board: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the board.");
+            });
+        }
+    }
+    // Collapsible Board Logic with Arrow Rotation
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const content = this.nextElementSibling;
+            const arrow = this.querySelector('.arrow');
+
+            if (content.style.display === 'block') {
+                content.style.display = 'none';
+                arrow.classList.remove('active');
+            } else {
+                content.style.display = 'block';
+                arrow.classList.add('active');
+            }
+        });
+    });
+</script>
+
 {% else %}
     <p>Hello! Please log in to access your watchlist.</p>
 {% endif %}

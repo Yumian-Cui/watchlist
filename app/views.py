@@ -1,4 +1,4 @@
-from flask import render_template, request, url_for, redirect, flash
+from flask import render_template, request, url_for, redirect, flash, jsonify
 from flask import Flask, render_template, flash, redirect, request, session
 from markupsafe import escape
 from flask_login import login_user, login_required, logout_user, current_user
@@ -88,6 +88,130 @@ def index():
 #     movies = Movie.query.filter_by(user_id=current_user.id).all() if current_user.is_authenticated else [] # New: Only get the current user's movies
 #     # movies = Movie.query.all()
 #     return render_template('watchlist/index.html', movies=movies, form=form)
+
+@app.route('/switch_board', methods=['POST'])
+def switch_board():
+    if not current_user.is_authenticated:
+        return jsonify({'success': False, 'error': 'You need to be logged in to switch boards.'}), 403
+
+    movie_id = request.form.get('movie_id')
+    board_id = request.form.get('board_id')
+    new_board_name = request.form.get('new_board_name')
+
+    movie = Movie.query.get_or_404(movie_id)
+
+    if movie.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized action.'}), 403
+
+    # If the 'new_board_name' is provided, prioritize creating a new board
+    if new_board_name:
+        # Check if a board with the same name already exists for the user
+        board = Board.query.filter_by(user_id=current_user.id, name=new_board_name).first()
+        if not board:
+            # Create a new board
+            board = Board(name=new_board_name, user_id=current_user.id)
+            db.session.add(board)
+            db.session.commit()
+        
+        # Update the movie's board to the newly created board
+        movie.board = board
+
+    elif board_id:
+        # If the user selected an existing board, assign the movie to that board
+        board = Board.query.get(board_id)
+        if not board:
+            return jsonify({'success': False, 'error': 'Selected board does not exist.'}), 404
+        
+        # Update the movie's board to the selected board
+        movie.board = board
+    
+    else:
+        return jsonify({'success': False, 'error': 'Please select a board or enter a new board name.'}), 400
+    
+    # Save changes to the movie
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_board/<int:board_id>', methods=['POST'])
+@login_required
+def delete_board(board_id):
+    try:
+        # Find the board by ID and check ownership if necessary
+        board = Board.query.get_or_404(board_id)
+
+        # Ensure the current user has permission to delete the board
+        # (Assuming you have some kind of ownership check)
+        if board.user_id != current_user.id:  # Replace 'user_id' with actual field
+            return jsonify({'success': False, 'error': 'Unauthorized action.'}), 403
+
+        # Delete all movies associated with the board
+        Movie.query.filter_by(board_id=board.id).delete()
+
+        # Delete the board itself
+        db.session.delete(board)
+        db.session.commit()
+
+        # Return a success response
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/edit_board', methods=['POST'])
+def edit_board():
+    data = request.get_json()  # Get JSON data from the request
+
+    board_id = data.get('edit_board_id')
+    new_board_name = data.get('edit_board_name')
+
+    if not board_id or not new_board_name:
+        return jsonify({'success': False, 'error': 'Invalid input.'}), 400
+
+    # Assume you have a function to get and update the board
+    board = Board.query.get(board_id)
+    if not board:
+        return jsonify({'success': False, 'error': 'Board not found.'}), 404
+
+    board.name = new_board_name
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
+# @app.route('/switch_board', methods=['POST'])
+# def switch_board():
+#     if not current_user.is_authenticated:
+#         return jsonify({'success': False, 'error': 'You need to be logged in to switch boards.'}), 403
+
+#     movie_id = request.form.get('movie_id')
+#     board_id = request.form.get('board_id')
+#     new_board_name = request.form.get('new_board_name')
+
+#     movie = Movie.query.get_or_404(movie_id)
+
+#     if movie.user_id != current_user.id:
+#         return jsonify({'success': False, 'error': 'Unauthorized action.'}), 403
+
+#     if new_board_name:
+#         # Create a new board if 'new_board_name' is provided
+#         board = Board.query.filter_by(user_id=current_user.id, name=new_board_name).first()
+#         if not board:
+#             board = Board(name=new_board_name, user_id=current_user.id)
+#             db.session.add(board)
+#             db.session.commit()
+#     else:
+#         # Use the selected board if it exists
+#         board = Board.query.get(board_id)
+    
+#     if board:
+#         # Update the movie's board to the new one
+#         movie.board = board
+#         db.session.commit()
+#         return jsonify({'success': True})
+#     else:
+#         return jsonify({'success': False, 'error': 'Could not find or create the board.'}), 400
+
 
 @app.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 @login_required
