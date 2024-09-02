@@ -3,7 +3,7 @@ from flask import url_for
 from flask_login import current_user
 
 from app import app, db,mail,s
-from app.models import Movie, User, EmailConfirmationToken
+from app.models import Movie, User, EmailConfirmationToken, Board
 from app.commands import forge, initdb
 
 # app_context: application's environment, needed interact with the application setup or configuration, but no request is in progress
@@ -33,7 +33,12 @@ class WatchlistTestCase(unittest.TestCase):
         user.set_password('123')
         db.session.add(user) # commit user first, otherwise id would be None if not committing it to db first
         db.session.commit()
-        movie = Movie(title='Test Movie Title', year='2019', user_id=user.id)
+        # 测试board
+        uncategorized_board = Board(name='Uncategorized', user_id=user.id)
+        db.session.add(uncategorized_board)
+        db.session.commit()     
+
+        movie = Movie(title='Test Movie Title', year='2019', user_id=user.id, board=uncategorized_board)
         db.session.add(movie)
         db.session.commit()
         #创建用户2用于测试duplicate
