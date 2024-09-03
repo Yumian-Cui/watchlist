@@ -5,7 +5,7 @@ from flask_login import current_user
 from wtforms import StringField as BaseStringField, PasswordField as BasePasswordField, Field as BaseField
 import datetime
 
-from app.models import User
+from watchlist.models import User
 
 class Field(BaseField):
     def __init__(self, label=None, validators=None, **kwargs):

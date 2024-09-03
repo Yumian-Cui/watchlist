@@ -1,7 +1,7 @@
 import click
 
-from app import app, db
-from app.models import User, Movie
+from watchlist import app, db
+from watchlist.models import User, Movie
 
 #编写一个自定义命令来自动执行创建数据库表操作
 @app.cli.command()  # 注册为命令，可以传入 name 参数来自定义命令

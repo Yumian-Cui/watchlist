@@ -1,7 +1,7 @@
 from flask_wtf.csrf import CSRFError
 from flask import render_template, redirect, request
 
-from app import app
+from watchlist import app
 
 #Refresh the page when The CSRF token has expired
 @app.errorhandler(CSRFError)

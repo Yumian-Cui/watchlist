@@ -5,9 +5,9 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_mail import Message
 
 
-from app import app, db, s, mail
-from app.models import User, Movie, EmailConfirmationToken, Board
-from app.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm, ReviewForm
+from watchlist import app, db, s, mail
+from watchlist.models import User, Movie, EmailConfirmationToken, Board
+from watchlist.forms import MovieForm, SettingsForm, LoginForm, RegisterForm, ResetPasswordForm, ReviewForm
 
 
 @app.route('/', methods=['GET', 'POST'])
